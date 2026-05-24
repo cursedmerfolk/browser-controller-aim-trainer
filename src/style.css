@@ -35,6 +35,13 @@ canvas {
   transition: transform 160ms ease;
 }
 
+.hud.hud-panel {
+  position: fixed;
+  top: 16px;
+  left: 16px;
+  width: min(320px, calc(100vw - 32px));
+}
+
 .hud-panel strong {
   font-size: 16px;
 }
@@ -61,6 +68,33 @@ canvas {
 .panel-content {
   display: grid;
   gap: 8px;
+}
+
+.hud .panel-content {
+  gap: 10px;
+}
+
+.hud-stat {
+  padding: 10px 12px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.08);
+  font-size: 18px;
+  font-weight: 700;
+  line-height: 1.2;
+}
+
+.hud-stat-primary {
+  background: rgba(255, 179, 71, 0.18);
+  border-color: rgba(255, 179, 71, 0.3);
+  font-size: 22px;
+}
+
+#gamepad-status,
+#framerate,
+#raw-stick {
+  font-size: 13px;
+  opacity: 0.9;
 }
 
 .edge-panel.is-collapsed .panel-content {

@@ -18,6 +18,8 @@ const PROJECTILE_UP_AXIS = new THREE.Vector3(0, 1, 0);
 const MUZZLE_SCALE = new THREE.Vector3(1, 1, 1);
 const TARGET_BODY_BASE_HEIGHT = 0.96;
 const TARGET_HEAD_RADIUS = 0.18;
+const BODY_SHOT_DAMAGE = 1;
+const HEAD_SHOT_DAMAGE = 1.5;
 const CENTER_SCREEN = new THREE.Vector2(0, 0);
 const BULLET_MAGNETISM_CONE_ANGLE = THREE.MathUtils.degToRad(1);
 const ADS_SNAP_CYLINDER_RADIUS = 1;
@@ -135,6 +137,7 @@ const state = {
   score: 0,
   shots: 0,
   hits: 0,
+  fps: 0,
   activeGamepadIndex: null,
   gamepadName: 'No controller detected',
   yaw: 0,
@@ -158,28 +161,26 @@ const audioState = {
 
 const app = document.querySelector('#app');
 app.innerHTML = `
-  <div class="hud-panel hud edge-panel is-collapsed" id="hud-panel" data-side="left">
+  <div class="hud-panel hud edge-panel" id="hud-panel" data-side="left">
     <div class="panel-header">
       <strong>Controller Aim Trainer</strong>
       <button
         class="panel-toggle"
         id="hud-panel-toggle"
         type="button"
-        aria-expanded="false"
+        aria-expanded="true"
         aria-label="Collapse Controller Aim Trainer panel"
       >
-        <span aria-hidden="true">˄</span>
+        <span aria-hidden="true">˅</span>
       </button>
     </div>
     <div class="panel-content">
       <div id="gamepad-status">Controller: ${state.gamepadName}</div>
-      <div id="mode-status">Aim mode: HIP FIRE</div>
-      <div id="curve-status">Curve: ${getResponseCurveLabel(SETTINGS.responseCurve)}</div>
-      <div id="recoil-status">Recoil: Y ${SETTINGS.recoilYStrength.toFixed(2)} | Var ${SETTINGS.recoilVariance.toFixed(2)} | Osc ${SETTINGS.recoilHorizontalOscillationStrength.toFixed(2)} | Int ${SETTINGS.recoilIntensityOscillator.toFixed(2)}</div>
-      <div id="accuracy">Accuracy: 0%</div>
-      <div id="hits">Hits: 0</div>
-      <div id="misses">Misses: 0</div>
-      <div id="score">Score (targets destroyed): 0</div>
+      <div id="framerate">FPS: 0</div>
+      <div id="accuracy" class="hud-stat">Accuracy: 0%</div>
+      <div id="hits" class="hud-stat">Hits: 0</div>
+      <div id="misses" class="hud-stat">Misses: 0</div>
+      <div id="score" class="hud-stat hud-stat-primary">Score: 0</div>
       <div id="raw-stick">Raw stick: X 0.00 | Y 0.00</div>
       <div class="button-row">
         <button id="reset-button" type="button">Restart</button>
@@ -493,9 +494,7 @@ const keyboard = new Set();
 const clock = new THREE.Clock();
 const hudElements = {
   gamepadStatus: document.querySelector('#gamepad-status'),
-  modeStatus: document.querySelector('#mode-status'),
-  curveStatus: document.querySelector('#curve-status'),
-  recoilStatus: document.querySelector('#recoil-status'),
+  framerate: document.querySelector('#framerate'),
   score: document.querySelector('#score'),
   accuracy: document.querySelector('#accuracy'),
   hits: document.querySelector('#hits'),
@@ -553,12 +552,15 @@ hudElements.resetButton.addEventListener('click', () => {
   state.score = 0;
   state.shots = 0;
   state.hits = 0;
+  state.yaw = 0;
+  state.pitch = 0;
   state.spreadKick = 0;
   state.weaponKick = 0;
   state.fireCooldown = 0;
   state.recoilShotIndex = 0;
   state.recoilPatternX = 0;
   state.recoilPatternY = 0;
+  updateCamera();
   resetTargets();
   clearProjectiles();
 });
@@ -793,6 +795,7 @@ initializePanelToggles();
 
 function loop() {
   const delta = clock.getDelta();
+  state.fps = delta > 0 ? (1 / delta) : 0;
   const input = getInputState();
   const directAimTarget = getDirectAimTarget();
 
@@ -1020,7 +1023,8 @@ function fireShot(delta) {
   const hitPoint = intersections[0]?.point ?? getMissPoint();
 
   if (intersections.length > 0) {
-    applyHitToTarget(getTargetRoot(intersections[0].object));
+    const hitObject = intersections[0].object;
+    applyHitToTarget(getTargetRoot(hitObject), hitObject === getTargetRoot(hitObject).userData.head);
   }
 
   createProjectileVisual(getProjectileStart(), hitPoint);
@@ -1199,9 +1203,9 @@ function createTarget() {
   return target;
 }
 
-function applyHitToTarget(target) {
+function applyHitToTarget(target, isHeadshot = false) {
   state.hits += 1;
-  target.userData.health -= 1;
+  target.userData.health -= isHeadshot ? HEAD_SHOT_DAMAGE : BODY_SHOT_DAMAGE;
   playHitTickSound();
 
   if (target.userData.health <= 0) {
@@ -1541,13 +1545,11 @@ function updateHud() {
   const misses = Math.max(0, state.shots - state.hits);
 
   hudElements.gamepadStatus.textContent = `Controller: ${state.gamepadName}`;
-  hudElements.modeStatus.textContent = `Aim mode: ${state.isAimingDownSights ? 'ADS' : 'HIP FIRE'}`;
-  hudElements.curveStatus.textContent = `Curve: ${getResponseCurveLabel(SETTINGS.responseCurve)}`;
-  hudElements.recoilStatus.textContent = `Recoil: Y ${SETTINGS.recoilYStrength.toFixed(2)} | Var ${SETTINGS.recoilVariance.toFixed(2)} | Osc ${SETTINGS.recoilHorizontalOscillationStrength.toFixed(2)} @ ${SETTINGS.recoilHorizontalOscillationSpeed.toFixed(2)} | Int ${SETTINGS.recoilIntensityOscillator.toFixed(2)} @ ${SETTINGS.recoilIntensityOscillationSpeed.toFixed(2)}`;
+  hudElements.framerate.textContent = `FPS: ${Math.round(state.fps)}`;
   hudElements.accuracy.textContent = `Accuracy: ${accuracy}%`;
   hudElements.hits.textContent = `Hits: ${state.hits}`;
   hudElements.misses.textContent = `Misses: ${misses}`;
-  hudElements.score.textContent = `Score (targets destroyed): ${state.score}`;
+  hudElements.score.textContent = `Score: ${state.score}`;
   hudElements.rawStick.textContent = `Raw stick: X ${state.rawStickX.toFixed(2)} | Y ${state.rawStickY.toFixed(2)}`;
 }
 
@@ -1669,10 +1671,6 @@ function isControlKey(code) {
     'KeyD',
     'Space'
   ].includes(code);
-}
-
-function getResponseCurveLabel(value) {
-  return RESPONSE_CURVE_OPTIONS.find((option) => option.value === value)?.label ?? 'Linear';
 }
 
 function getAudioContext() {
