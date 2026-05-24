@@ -18,6 +18,8 @@ const WORLD_UP_AXIS = new THREE.Vector3(0, 1, 0);
 const MUZZLE_SCALE = new THREE.Vector3(1, 1, 1);
 const TARGET_BODY_BASE_HEIGHT = 0.96;
 const TARGET_HEAD_RADIUS = 0.18;
+const LEGACY_TARGET_SPEED_MIN = 0.45;
+const LEGACY_TARGET_SPEED_MAX = 1.8;
 
 const DEFAULT_SETTINGS = {
   lookSensitivity: 2.8,
@@ -32,7 +34,8 @@ const DEFAULT_SETTINGS = {
   recoilHorizontalOscillationSpeed: 0.82,
   recoilIntensityOscillator: 0.35,
   recoilIntensityOscillationSpeed: 0.37,
-  sphereSpeed: 1.35,
+  targetHorizontalSpeedMin: 0.61,
+  targetHorizontalSpeedMax: 2.43,
   targetCount: 8,
   targetRadius: 0.45,
   targetMaxHealth: 12,
@@ -40,8 +43,6 @@ const DEFAULT_SETTINGS = {
   spawnDistanceMax: 36,
   targetLifetimeMin: 6,
   targetLifetimeMax: 9,
-  targetHorizontalSpeedMin: 0.45,
-  targetHorizontalSpeedMax: 1.8,
   adsFovMultiplier: 0.72,
   adsSensitivityMultiplier: 0.58,
   hipFireSpreadPx: 18,
@@ -159,12 +160,20 @@ app.innerHTML = `
       value: SETTINGS.projectileRate
     })}
     ${renderNumericControl({
-      id: 'sphere-speed',
-      label: 'Sphere speed',
-      min: 0.4,
-      max: 2.5,
+      id: 'target-speed-min',
+      label: 'Min target speed',
+      min: 0.1,
+      max: 5,
       step: 0.05,
-      value: SETTINGS.sphereSpeed
+      value: SETTINGS.targetHorizontalSpeedMin
+    })}
+    ${renderNumericControl({
+      id: 'target-speed-max',
+      label: 'Max target speed',
+      min: 0.1,
+      max: 5,
+      step: 0.05,
+      value: SETTINGS.targetHorizontalSpeedMax
     })}
     ${renderNumericControl({
       id: 'recoil-y-strength',
@@ -426,12 +435,30 @@ bindNumericSetting({
 });
 
 bindNumericSetting({
-  id: 'sphere-speed',
-  min: 0.4,
-  max: 2.5,
-  fallback: DEFAULT_SETTINGS.sphereSpeed,
+  id: 'target-speed-min',
+  min: 0.1,
+  max: 5,
+  fallback: DEFAULT_SETTINGS.targetHorizontalSpeedMin,
   onChange: (value) => {
-    SETTINGS.sphereSpeed = value;
+    SETTINGS.targetHorizontalSpeedMin = value;
+    if (SETTINGS.targetHorizontalSpeedMax < value) {
+      SETTINGS.targetHorizontalSpeedMax = value;
+      setNumericControlValue('target-speed-max', value);
+    }
+  }
+});
+
+bindNumericSetting({
+  id: 'target-speed-max',
+  min: 0.1,
+  max: 5,
+  fallback: DEFAULT_SETTINGS.targetHorizontalSpeedMax,
+  onChange: (value) => {
+    SETTINGS.targetHorizontalSpeedMax = value;
+    if (SETTINGS.targetHorizontalSpeedMin > value) {
+      SETTINGS.targetHorizontalSpeedMin = value;
+      setNumericControlValue('target-speed-min', value);
+    }
   }
 });
 
@@ -919,7 +946,7 @@ function respawnTarget(target) {
 }
 
 function getRandomTargetMoveSpeed() {
-  return randomRange(SETTINGS.targetHorizontalSpeedMin, SETTINGS.targetHorizontalSpeedMax) * SETTINGS.sphereSpeed;
+  return randomRange(SETTINGS.targetHorizontalSpeedMin, SETTINGS.targetHorizontalSpeedMax);
 }
 
 function getHorizontalVelocity(moveSpeed) {
@@ -1072,6 +1099,20 @@ function bindNumericSetting({ id, min, max, fallback, onChange }) {
   });
 }
 
+function setNumericControlValue(id, value) {
+  const rangeInput = document.querySelector(`#${id}-range`);
+  const numberInput = document.querySelector(`#${id}-number`);
+  const stringValue = String(value);
+
+  if (rangeInput) {
+    rangeInput.value = stringValue;
+  }
+
+  if (numberInput) {
+    numberInput.value = stringValue;
+  }
+}
+
 function initializePanelToggles() {
   const panels = [hudElements.hudPanel, hudElements.settingsPanel, hudElements.controlsPanel];
 
@@ -1154,6 +1195,15 @@ function loadStoredSettings() {
 
   try {
     const parsed = JSON.parse(storedValue);
+    const legacySphereSpeed = clampSetting(parsed.sphereSpeed, 0.4, 2.5, 1.35);
+    const targetHorizontalSpeedMin =
+      typeof parsed.targetHorizontalSpeedMin === 'number'
+        ? parsed.targetHorizontalSpeedMin
+        : LEGACY_TARGET_SPEED_MIN * legacySphereSpeed;
+    const targetHorizontalSpeedMax =
+      typeof parsed.targetHorizontalSpeedMax === 'number'
+        ? parsed.targetHorizontalSpeedMax
+        : LEGACY_TARGET_SPEED_MAX * legacySphereSpeed;
 
     return {
       lookSensitivity: clampSetting(parsed.lookSensitivity, 0.5, 6, DEFAULT_SETTINGS.lookSensitivity),
@@ -1191,7 +1241,8 @@ function loadStoredSettings() {
         2,
         DEFAULT_SETTINGS.recoilIntensityOscillationSpeed
       ),
-      sphereSpeed: clampSetting(parsed.sphereSpeed, 0.4, 2.5, DEFAULT_SETTINGS.sphereSpeed),
+      targetHorizontalSpeedMin: clampSetting(targetHorizontalSpeedMin, 0.1, 5, DEFAULT_SETTINGS.targetHorizontalSpeedMin),
+      targetHorizontalSpeedMax: clampSetting(targetHorizontalSpeedMax, 0.1, 5, DEFAULT_SETTINGS.targetHorizontalSpeedMax),
       responseCurve: sanitizeResponseCurve(parsed.responseCurve),
       invertY: typeof parsed.invertY === 'boolean' ? parsed.invertY : DEFAULT_SETTINGS.invertY
     };
@@ -1215,7 +1266,8 @@ function storeSettings() {
       recoilHorizontalOscillationSpeed: SETTINGS.recoilHorizontalOscillationSpeed,
       recoilIntensityOscillator: SETTINGS.recoilIntensityOscillator,
       recoilIntensityOscillationSpeed: SETTINGS.recoilIntensityOscillationSpeed,
-      sphereSpeed: SETTINGS.sphereSpeed,
+      targetHorizontalSpeedMin: SETTINGS.targetHorizontalSpeedMin,
+      targetHorizontalSpeedMax: SETTINGS.targetHorizontalSpeedMax,
       responseCurve: SETTINGS.responseCurve,
       invertY: SETTINGS.invertY
     })
