@@ -23,8 +23,12 @@ const HEAD_SHOT_DAMAGE = 1.5;
 const PLAYER_EYE_HEIGHT = 2.2;
 const PLAYER_MAX_HEALTH = 50;
 const PLAYER_STRAFE_SPEED = 12;
+const PLAYER_STRAFE_ACCELERATION = 14;
+const PLAYER_STRAFE_DECELERATION = 12;
 const TARGET_FIRE_INTERVAL_MIN = 1.4;
 const TARGET_FIRE_INTERVAL_MAX = 2.6;
+const TARGET_PROJECTILES_PER_BURST = 2;
+const TARGET_PROJECTILE_BURST_SPREAD = 0.35;
 const TARGET_PROJECTILE_DAMAGE = 1;
 const TARGET_PROJECTILE_HIT_RADIUS = 0.4;
 const TARGET_PROJECTILE_SPEED = 54;
@@ -167,6 +171,7 @@ const state = {
   damageFlinch: 0,
   damageFlinchDirection: 1,
   restartPressedLastFrame: false,
+  strafeVelocityX: 0,
   playerVelocity: new THREE.Vector3(),
   isAimingDownSights: false,
   aimBlend: 0,
@@ -679,6 +684,7 @@ function restartGame() {
   state.damageFlash = 0;
   state.damageFlinch = 0;
   state.restartPressedLastFrame = false;
+  state.strafeVelocityX = 0;
   camera.position.set(0, PLAYER_EYE_HEIGHT, 0);
   previousCameraOrigin.copy(camera.position);
   updateCamera();
@@ -961,16 +967,16 @@ function loop(frameTime = 0) {
     restartGame();
   }
   state.restartPressedLastFrame = input.restartPressed;
-  const directAimTarget = input.allowAimAssist ? getDirectAimTarget() : null;
+  const aimSlowTarget = input.controllerAimAssistActive ? getAimSlowTarget() : null;
 
   updateAimState(delta, input.adsPressed, input.shootPressed);
   applyPlayerMovement(input.moveX, delta);
-  applyLookInput(input.controllerLookX, input.controllerLookY, delta, directAimTarget, input.allowAimAssist);
+  applyLookInput(input.controllerLookX, input.controllerLookY, delta, aimSlowTarget, input.controllerAimAssistActive);
   applyMouseLookInput(input.mouseLookX, input.mouseLookY);
   updateCamera();
   updatePlayerVelocity(delta);
-  const firedThisFrame = state.isGameOver ? false : updateFiring(delta, input.shootPressed, input.allowAimAssist);
-  if (!firedThisFrame && input.allowAimAssist && !state.isGameOver) {
+  const firedThisFrame = state.isGameOver ? false : updateFiring(delta, input.shootPressed, input.controllerAimAssistActive);
+  if (!firedThisFrame && input.controllerAimAssistActive && !state.isGameOver) {
     applyAimAssist(delta);
   }
   updateCamera();
@@ -994,7 +1000,6 @@ function getInputState() {
   let adsPressed = keyboard.has('ShiftLeft') || keyboard.has('ShiftRight') || state.mouseAdsToggled;
   let restartPressed = keyboard.has('Enter');
   let usingGamepad = false;
-  const usingMouseAim = document.pointerLockElement === renderer.domElement;
 
   const pad = getActiveGamepad();
   if (pad) {
@@ -1031,8 +1036,7 @@ function getInputState() {
     adsPressed,
     restartPressed,
     usingGamepad,
-    usingMouseAim,
-    allowAimAssist: usingGamepad && !usingMouseAim
+    controllerAimAssistActive: usingGamepad
   };
 }
 
@@ -1092,9 +1096,9 @@ function getTargetRoot(object) {
   return object.userData.targetRoot ?? object;
 }
 
-function applyLookInput(lookX, lookY, delta, directAimTarget, usingControllerAim) {
+function applyLookInput(lookX, lookY, delta, aimSlowTarget, usingControllerAim) {
   let sensitivityMultiplier = THREE.MathUtils.lerp(1, SETTINGS.adsSensitivityMultiplier, state.aimBlend);
-  if (usingControllerAim && directAimTarget && SETTINGS.aimSlow > 0) {
+  if (usingControllerAim && aimSlowTarget && SETTINGS.aimSlow > 0) {
     sensitivityMultiplier *= THREE.MathUtils.lerp(1, 0.25, SETTINGS.aimSlow);
   }
 
@@ -1159,11 +1163,16 @@ function isAdsSnapActive() {
 }
 
 function applyPlayerMovement(moveX, delta) {
-  if (moveX === 0) {
-    return;
+  const targetVelocityX = moveX * PLAYER_STRAFE_SPEED;
+  const acceleration =
+    Math.abs(targetVelocityX) > Math.abs(state.strafeVelocityX) ? PLAYER_STRAFE_ACCELERATION : PLAYER_STRAFE_DECELERATION;
+  state.strafeVelocityX = THREE.MathUtils.damp(state.strafeVelocityX, targetVelocityX, acceleration, delta);
+
+  if (Math.abs(state.strafeVelocityX) < 0.001) {
+    state.strafeVelocityX = 0;
   }
 
-  camera.position.x += moveX * PLAYER_STRAFE_SPEED * delta;
+  camera.position.x += state.strafeVelocityX * delta;
   camera.position.y = PLAYER_EYE_HEIGHT;
 }
 
@@ -1379,9 +1388,10 @@ function updateProjectiles(delta) {
   }
 }
 
-function fireTargetProjectile(target) {
+function fireTargetProjectile(target, aimOffsetX = 0) {
   const start = target.localToWorld(target.userData.head.position.clone());
   const aimedPoint = getCameraOrigin();
+  aimedPoint.x += aimOffsetX;
   const toTargetPoint = aimedPoint.clone().sub(start);
   const distance = toTargetPoint.length();
 
@@ -1629,7 +1639,10 @@ function updateTargets(delta) {
     updateTargetPosition(target);
 
     if (!state.isGameOver && target.userData.fireCooldown <= 0) {
-      fireTargetProjectile(target);
+      for (let burstIndex = 0; burstIndex < TARGET_PROJECTILES_PER_BURST; burstIndex += 1) {
+        const burstCenterOffset = burstIndex - (TARGET_PROJECTILES_PER_BURST - 1) / 2;
+        fireTargetProjectile(target, burstCenterOffset * TARGET_PROJECTILE_BURST_SPREAD);
+      }
       target.userData.fireCooldown = randomRange(TARGET_FIRE_INTERVAL_MIN, TARGET_FIRE_INTERVAL_MAX);
     }
 
@@ -2086,7 +2099,14 @@ async function ensureAudioReady() {
   }
 
   if (context.state === 'suspended') {
-    await context.resume();
+    try {
+      await context.resume();
+    } catch (error) {
+      if (error instanceof DOMException && error.name === 'NotAllowedError') {
+        return null;
+      }
+      throw error;
+    }
   }
 
   return context.state === 'running' ? context : null;
@@ -2097,8 +2117,12 @@ function unlockAudioOnInteraction() {
 }
 
 function playHitTickSound() {
-  const context = getAudioContext();
-  if (!context || context.state !== 'running') {
+  void playHitTickSoundAsync();
+}
+
+async function playHitTickSoundAsync() {
+  const context = await ensureAudioReady();
+  if (!context) {
     return;
   }
 
@@ -2116,15 +2140,15 @@ function playHitTickSound() {
   filter.Q.value = 2.5;
 
   gain.gain.setValueAtTime(0.0001, now);
-  gain.gain.exponentialRampToValueAtTime(0.015, now + 0.004);
-  gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.05);
+  gain.gain.exponentialRampToValueAtTime(0.03, now + 0.004);
+  gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.06);
 
   oscillator.connect(filter);
   filter.connect(gain);
   gain.connect(context.destination);
 
   oscillator.start(now);
-  oscillator.stop(now + 0.055);
+  oscillator.stop(now + 0.065);
   oscillator.addEventListener('ended', () => {
     oscillator.disconnect();
     filter.disconnect();
@@ -2590,6 +2614,10 @@ function getDirectAimTarget() {
   raycaster.setFromCamera(CENTER_SCREEN, camera);
   const intersections = raycaster.intersectObjects(targets, true);
   return intersections[0] ? getTargetRoot(intersections[0].object) : null;
+}
+
+function getAimSlowTarget() {
+  return getNearestTargetInCone(getCameraOrigin(), getCameraForward(), BULLET_MAGNETISM_CONE_ANGLE);
 }
 
 function getTargetAimPoint(target, origin = getCameraOrigin(), direction = getCameraForward()) {
