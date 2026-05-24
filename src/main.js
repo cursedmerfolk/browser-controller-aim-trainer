@@ -41,8 +41,8 @@ const DEFAULT_SETTINGS = {
   spawnDistanceMax: 28,
   targetLifetimeMin: 6,
   targetLifetimeMax: 9,
-  targetHorizontalSpeedMin: 0.6,
-  targetHorizontalSpeedMax: 1.2,
+  targetHorizontalSpeedMin: 0.45,
+  targetHorizontalSpeedMax: 1.8,
   adsFovMultiplier: 0.72,
   adsSensitivityMultiplier: 0.58,
   hipFireSpreadPx: 18,
@@ -597,6 +597,7 @@ function fireShot() {
     0,
     2
   );
+  applyAimRecoil(sprayPoint);
 
   raycaster.setFromCamera(shotOffset, camera);
   const intersections = raycaster.intersectObjects(targets, true);
@@ -615,6 +616,14 @@ function getMissPoint() {
 
 function getProjectileStart() {
   return weapon.localToWorld(weapon.userData.barrelTipLocal.clone());
+}
+
+function applyAimRecoil(recoilPoint) {
+  const horizontalKick = recoilPoint.x * SETTINGS.recoilPatternStrength * THREE.MathUtils.lerp(0.009, 0.0055, state.aimBlend);
+  const verticalKick = recoilPoint.y * SETTINGS.recoilPatternStrength * THREE.MathUtils.lerp(0.013, 0.0085, state.aimBlend);
+
+  state.yaw -= horizontalKick;
+  state.pitch = THREE.MathUtils.clamp(state.pitch + verticalKick, -0.85, 0.85);
 }
 
 function getShotOffset(sprayPoint) {
@@ -779,10 +788,10 @@ function respawnTarget(target) {
     .clone()
     .addScaledVector(horizontalForward, distance)
     .addScaledVector(horizontalRight, lateralOffset);
-  if (Math.random() < 0.35) {
+  if (Math.random() < 0.3) {
     worldPosition.y = target.userData.feetClearance;
   } else {
-    worldPosition.y = randomRange(target.userData.feetClearance, 0.7);
+    worldPosition.y = randomRange(target.userData.feetClearance, 1.15);
   }
 
   const horizontalVelocity = getHorizontalVelocity();
@@ -877,7 +886,7 @@ function createWeaponModel() {
   barrel.rotation.x = Math.PI / 2;
   barrel.position.set(0, -0.02, -1);
   rifle.add(barrel);
-  rifle.userData.barrelTipLocal = new THREE.Vector3(0, -0.02, -1.34);
+  rifle.userData.barrelTipLocal = new THREE.Vector3(0, -0.02, -1.5);
 
   const sight = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.035, 0.16), accentMaterial);
   sight.position.set(0, 0.0475, -0.27);
@@ -893,7 +902,7 @@ function createWeaponModel() {
 function updateWeaponTransform() {
   weapon.position.set(
     THREE.MathUtils.lerp(0.24, 0, state.aimBlend) + state.recoilPatternX * 0.01 * (1 - state.aimBlend * 0.85),
-    THREE.MathUtils.lerp(-0.2, -0.1, state.aimBlend) - state.weaponKick * 0.025 - state.recoilPatternY * 0.008,
+    THREE.MathUtils.lerp(-0.2, -0.12, state.aimBlend) - state.weaponKick * 0.025 - state.recoilPatternY * 0.008,
     THREE.MathUtils.lerp(-0.24, -0.17, state.aimBlend) + state.weaponKick * 0.05
   );
 
