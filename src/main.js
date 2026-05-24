@@ -19,6 +19,9 @@ const WORLD_UP_AXIS = new THREE.Vector3(0, 1, 0);
 const MUZZLE_SCALE = new THREE.Vector3(1, 1, 1);
 const TARGET_BODY_BASE_HEIGHT = 0.96;
 const TARGET_HEAD_RADIUS = 0.18;
+const CENTER_SCREEN = new THREE.Vector2(0, 0);
+const BULLET_MAGNETISM_CONE_ANGLE = THREE.MathUtils.degToRad(8);
+const ADS_SNAP_CONE_ANGLE = THREE.MathUtils.degToRad(10);
 const LEGACY_TARGET_SPEED_MIN = 0.45;
 const LEGACY_TARGET_SPEED_MAX = 1.8;
 const LEGACY_SETTINGS_ORDER = [
@@ -44,6 +47,10 @@ const DEFAULT_SETTINGS = {
   fov: 110,
   responseCurve: 'linear',
   projectileRate: 14,
+  bulletMagnetism: 0,
+  aimSlow: 0,
+  aimStickiness: 0,
+  adsSnap: 0,
   recoilYStrength: 0.6,
   recoilVariance: 0.18,
   recoilHorizontalOscillationStrength: 0.3,
@@ -129,6 +136,12 @@ app.innerHTML = `
     <span class="crosshair-tick crosshair-tick-bottom"></span>
     <span class="crosshair-tick crosshair-tick-left"></span>
   </div>
+  <div class="hud-panel axis-legend" aria-live="polite">
+    <strong>World axes</strong>
+    <div>X+: right | X-: left</div>
+    <div>Y+: up | Y-: down</div>
+    <div>Z-: forward/range | Z+: behind player</div>
+  </div>
   <div class="hud-panel settings-panel edge-panel is-collapsed" id="settings-panel" data-side="right">
     <div class="panel-header">
       <strong>Controller settings</strong>
@@ -174,6 +187,38 @@ app.innerHTML = `
       max: 15,
       step: 0.5,
       value: SETTINGS.projectileRate
+    })}
+    ${renderNumericControl({
+      id: 'bullet-magnetism',
+      label: 'Bullet magnetism',
+      min: 0,
+      max: 1,
+      step: 0.01,
+      value: SETTINGS.bulletMagnetism
+    })}
+    ${renderNumericControl({
+      id: 'aim-slow',
+      label: 'Aim slow',
+      min: 0,
+      max: 1,
+      step: 0.01,
+      value: SETTINGS.aimSlow
+    })}
+    ${renderNumericControl({
+      id: 'aim-stickiness',
+      label: 'Aim stickiness',
+      min: 0,
+      max: 1,
+      step: 0.01,
+      value: SETTINGS.aimStickiness
+    })}
+    ${renderNumericControl({
+      id: 'ads-snap',
+      label: 'ADS snap',
+      min: 0,
+      max: 1,
+      step: 0.01,
+      value: SETTINGS.adsSnap
     })}
     ${renderNumericControl({
       id: 'target-speed-min',
@@ -319,6 +364,8 @@ scene.add(backWall);
 
 const weapon = createWeaponModel();
 camera.add(weapon);
+const aimAssistDebugVisuals = createAimAssistDebugVisuals();
+camera.add(aimAssistDebugVisuals.group);
 
 const targets = [];
 const projectiles = [];
@@ -451,6 +498,46 @@ bindNumericSetting({
 });
 
 bindNumericSetting({
+  id: 'bullet-magnetism',
+  min: 0,
+  max: 1,
+  fallback: DEFAULT_SETTINGS.bulletMagnetism,
+  onChange: (value) => {
+    SETTINGS.bulletMagnetism = value;
+  }
+});
+
+bindNumericSetting({
+  id: 'aim-slow',
+  min: 0,
+  max: 1,
+  fallback: DEFAULT_SETTINGS.aimSlow,
+  onChange: (value) => {
+    SETTINGS.aimSlow = value;
+  }
+});
+
+bindNumericSetting({
+  id: 'aim-stickiness',
+  min: 0,
+  max: 1,
+  fallback: DEFAULT_SETTINGS.aimStickiness,
+  onChange: (value) => {
+    SETTINGS.aimStickiness = value;
+  }
+});
+
+bindNumericSetting({
+  id: 'ads-snap',
+  min: 0,
+  max: 1,
+  fallback: DEFAULT_SETTINGS.adsSnap,
+  onChange: (value) => {
+    SETTINGS.adsSnap = value;
+  }
+});
+
+bindNumericSetting({
   id: 'target-speed-min',
   min: 0.1,
   max: 5,
@@ -553,10 +640,14 @@ initializePanelToggles();
 function loop() {
   const delta = clock.getDelta();
   const input = getInputState();
+  const directAimTarget = getDirectAimTarget();
 
   updateAimState(delta, input.adsPressed, input.shootPressed);
-  applyLookInput(input.lookX, input.lookY, delta);
+  applyLookInput(input.lookX, input.lookY, delta, directAimTarget, input.usingGamepad);
   updateCamera();
+  applyAimAssist(delta);
+  updateCamera();
+  updateAimAssistDebugVisuals();
   updateFiring(delta, input.shootPressed);
   updateWeaponTransform();
   updateTargets(delta);
@@ -573,9 +664,11 @@ function getInputState() {
   let lookY = 0;
   let shootPressed = keyboard.has('Space');
   let adsPressed = keyboard.has('ShiftLeft') || keyboard.has('ShiftRight');
+  let usingGamepad = false;
 
   const pad = getActiveGamepad();
   if (pad) {
+    usingGamepad = true;
     state.rawStickX = pad.axes[2] ?? 0;
     state.rawStickY = pad.axes[3] ?? 0;
 
@@ -593,7 +686,7 @@ function getInputState() {
   if (keyboard.has('ArrowUp') || keyboard.has('KeyW')) lookY -= 0.7;
   if (keyboard.has('ArrowDown') || keyboard.has('KeyS')) lookY += 0.7;
 
-  return { lookX, lookY, shootPressed, adsPressed };
+  return { lookX, lookY, shootPressed, adsPressed, usingGamepad };
 }
 
 function discoverController(showHint = false) {
@@ -652,8 +745,12 @@ function getTargetRoot(object) {
   return object.userData.targetRoot ?? object;
 }
 
-function applyLookInput(lookX, lookY, delta) {
-  const sensitivityMultiplier = THREE.MathUtils.lerp(1, SETTINGS.adsSensitivityMultiplier, state.aimBlend);
+function applyLookInput(lookX, lookY, delta, directAimTarget, usingGamepad) {
+  let sensitivityMultiplier = THREE.MathUtils.lerp(1, SETTINGS.adsSensitivityMultiplier, state.aimBlend);
+  if (usingGamepad && directAimTarget && SETTINGS.aimSlow > 0) {
+    sensitivityMultiplier *= THREE.MathUtils.lerp(1, 0.25, SETTINGS.aimSlow);
+  }
+
   const lookSensitivity = SETTINGS.lookSensitivity * sensitivityMultiplier;
   const verticalLook = SETTINGS.invertY ? -lookY : lookY;
 
@@ -672,6 +769,20 @@ function updateAimState(delta, adsPressed, shootPressed) {
 
   if (!shootPressed) {
     state.recoilShotIndex = 0;
+  }
+}
+
+function applyAimAssist(delta) {
+  const directAimTarget = getDirectAimTarget();
+  if (directAimTarget && SETTINGS.aimStickiness > 0) {
+    nudgeAimTowardTarget(directAimTarget, 1 - Math.exp(-delta * 10 * SETTINGS.aimStickiness));
+  }
+
+  if (state.isAimingDownSights && SETTINGS.adsSnap > 0) {
+    const nearbyTarget = getNearestTargetInCone(getCameraOrigin(), getCameraForward(), ADS_SNAP_CONE_ANGLE);
+    if (nearbyTarget) {
+      nudgeAimTowardTarget(nearbyTarget, 1 - Math.exp(-delta * 14 * SETTINGS.adsSnap));
+    }
   }
 }
 
@@ -730,7 +841,8 @@ function fireShot() {
   );
   applyAimRecoil(recoilPoint);
 
-  raycaster.setFromCamera(shotOffset, camera);
+  const shotDirection = getShotDirection(shotOffset);
+  raycaster.set(getCameraOrigin(), shotDirection);
   const intersections = raycaster.intersectObjects(targets, true);
   const hitPoint = intersections[0]?.point ?? getMissPoint();
 
@@ -743,6 +855,23 @@ function fireShot() {
 
 function getMissPoint() {
   return raycaster.ray.origin.clone().add(raycaster.ray.direction.clone().multiplyScalar(SETTINGS.projectileMaxDistance));
+}
+
+function getShotDirection(shotOffset) {
+  raycaster.setFromCamera(shotOffset, camera);
+  const baseDirection = raycaster.ray.direction.clone();
+
+  if (SETTINGS.bulletMagnetism <= 0) {
+    return baseDirection;
+  }
+
+  const magnetismTarget = getNearestTargetInCone(getCameraOrigin(), baseDirection, BULLET_MAGNETISM_CONE_ANGLE);
+  if (!magnetismTarget) {
+    return baseDirection;
+  }
+
+  const magnetizedDirection = getTargetAimPoint(magnetismTarget).sub(getCameraOrigin()).normalize();
+  return baseDirection.addScaledVector(magnetizedDirection, SETTINGS.bulletMagnetism).normalize();
 }
 
 function getProjectileStart() {
@@ -1039,6 +1168,58 @@ function createWeaponModel() {
   return rifle;
 }
 
+function createAimAssistDebugVisuals() {
+  const group = new THREE.Group();
+  const lineLength = SETTINGS.projectileMaxDistance;
+  const rayMaterial = new THREE.MeshBasicMaterial({
+    color: 0x48c7ff,
+    transparent: true,
+    opacity: 0.18,
+    depthWrite: false
+  });
+  const magnetismMaterial = new THREE.MeshBasicMaterial({
+    color: 0xffb347,
+    transparent: true,
+    opacity: 0.12,
+    side: THREE.DoubleSide,
+    depthWrite: false
+  });
+  const adsSnapMaterial = new THREE.MeshBasicMaterial({
+    color: 0xff4d6d,
+    transparent: true,
+    opacity: 0.1,
+    side: THREE.DoubleSide,
+    depthWrite: false
+  });
+
+  const directRay = new THREE.Mesh(new THREE.CylinderGeometry(0.018, 0.018, lineLength, 10), rayMaterial);
+  directRay.rotation.x = Math.PI / 2;
+  directRay.position.z = -lineLength / 2;
+  group.add(directRay);
+
+  const magnetismCone = createDebugCone(BULLET_MAGNETISM_CONE_ANGLE, lineLength, magnetismMaterial);
+  group.add(magnetismCone);
+
+  const adsSnapCone = createDebugCone(ADS_SNAP_CONE_ANGLE, lineLength, adsSnapMaterial);
+  group.add(adsSnapCone);
+
+  return { group, directRay, magnetismCone, adsSnapCone };
+}
+
+function createDebugCone(angle, length, material) {
+  const radius = Math.tan(angle) * length;
+  const cone = new THREE.Mesh(new THREE.ConeGeometry(radius, length, 24, 1, true), material);
+  cone.rotation.x = Math.PI / 2;
+  cone.position.z = -length / 2;
+  return cone;
+}
+
+function updateAimAssistDebugVisuals() {
+  aimAssistDebugVisuals.directRay.visible = true;
+  aimAssistDebugVisuals.magnetismCone.visible = SETTINGS.bulletMagnetism > 0;
+  aimAssistDebugVisuals.adsSnapCone.visible = SETTINGS.adsSnap > 0 && state.isAimingDownSights;
+}
+
 function updateWeaponTransform() {
   const baseTransform = getBaseWeaponTransform();
 
@@ -1227,6 +1408,10 @@ function loadStoredSettings() {
       deadzone: clampSetting(storedSettings.deadzone, 0, 0.35, DEFAULT_SETTINGS.deadzone),
       fov: clampSetting(storedSettings.fov, 50, 110, DEFAULT_SETTINGS.fov),
       projectileRate: clampSetting(storedSettings.projectileRate, 1, 15, DEFAULT_SETTINGS.projectileRate),
+      bulletMagnetism: clampSetting(storedSettings.bulletMagnetism, 0, 1, DEFAULT_SETTINGS.bulletMagnetism),
+      aimSlow: clampSetting(storedSettings.aimSlow, 0, 1, DEFAULT_SETTINGS.aimSlow),
+      aimStickiness: clampSetting(storedSettings.aimStickiness, 0, 1, DEFAULT_SETTINGS.aimStickiness),
+      adsSnap: clampSetting(storedSettings.adsSnap, 0, 1, DEFAULT_SETTINGS.adsSnap),
       recoilYStrength: clampSetting(
         storedSettings.recoilYStrength ?? storedSettings.recoilPatternStrength ?? storedSettings.sprayPatternStrength,
         0.05,
@@ -1279,6 +1464,10 @@ function storeSettings() {
         deadzone: SETTINGS.deadzone,
         fov: SETTINGS.fov,
         projectileRate: SETTINGS.projectileRate,
+        bulletMagnetism: SETTINGS.bulletMagnetism,
+        aimSlow: SETTINGS.aimSlow,
+        aimStickiness: SETTINGS.aimStickiness,
+        adsSnap: SETTINGS.adsSnap,
         recoilYStrength: SETTINGS.recoilYStrength,
         recoilVariance: SETTINGS.recoilVariance,
         recoilHorizontalOscillationStrength: SETTINGS.recoilHorizontalOscillationStrength,
@@ -1314,6 +1503,65 @@ function getStoredSettingsMap(parsed) {
   }
 
   return {};
+}
+
+function getCameraOrigin() {
+  return camera.getWorldPosition(new THREE.Vector3());
+}
+
+function getCameraForward() {
+  return camera.getWorldDirection(new THREE.Vector3()).normalize();
+}
+
+function getDirectAimTarget() {
+  raycaster.setFromCamera(CENTER_SCREEN, camera);
+  const intersections = raycaster.intersectObjects(targets, true);
+  return intersections[0] ? getTargetRoot(intersections[0].object) : null;
+}
+
+function getTargetAimPoint(target) {
+  return target.position.clone().add(new THREE.Vector3(0, target.userData.totalHeight * 0.62, 0));
+}
+
+function getNearestTargetInCone(origin, direction, maxAngle) {
+  let nearestTarget = null;
+  let nearestDistance = Number.POSITIVE_INFINITY;
+  let nearestAngle = Number.POSITIVE_INFINITY;
+  const normalizedDirection = direction.clone().normalize();
+
+  for (const target of targets) {
+    const toTarget = getTargetAimPoint(target).sub(origin);
+    const distance = toTarget.length();
+    if (distance <= 0.0001 || distance > SETTINGS.projectileMaxDistance) {
+      continue;
+    }
+
+    const angle = normalizedDirection.angleTo(toTarget.clone().normalize());
+    if (angle > maxAngle) {
+      continue;
+    }
+
+    if (distance < nearestDistance || (Math.abs(distance - nearestDistance) < 0.001 && angle < nearestAngle)) {
+      nearestTarget = target;
+      nearestDistance = distance;
+      nearestAngle = angle;
+    }
+  }
+
+  return nearestTarget;
+}
+
+function nudgeAimTowardTarget(target, amount) {
+  const targetDirection = getTargetAimPoint(target).sub(getCameraOrigin()).normalize();
+  const desiredYaw = Math.atan2(-targetDirection.x, -targetDirection.z);
+  const desiredPitch = Math.asin(THREE.MathUtils.clamp(targetDirection.y, -1, 1));
+
+  state.yaw += getShortestAngleDelta(state.yaw, desiredYaw) * amount;
+  state.pitch = THREE.MathUtils.clamp(state.pitch + (desiredPitch - state.pitch) * amount, -0.85, 0.85);
+}
+
+function getShortestAngleDelta(fromAngle, toAngle) {
+  return Math.atan2(Math.sin(toAngle - fromAngle), Math.cos(toAngle - fromAngle));
 }
 
 function clampSetting(value, min, max, fallback) {

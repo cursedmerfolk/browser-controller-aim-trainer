@@ -150,9 +150,19 @@ canvas {
   gap: 12px;
 }
 
+.axis-legend {
+position: fixed;
+right: 16px;
+bottom: 16px;
+max-width: min(320px, calc(100vw - 32px));
+font-size: 12px;
+line-height: 1.45;
+pointer-events: none;
+}
+
 .control-group {
-  display: grid;
-  gap: 6px;
+display: grid;
+gap: 6px;
 }
 
 .control-inputs {
