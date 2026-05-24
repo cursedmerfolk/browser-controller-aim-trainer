@@ -57,6 +57,9 @@ const GAME_SETTING_KEYS = [
   'targetCount',
   'targetRadius',
   'targetMaxHealth',
+  'targetSpawnYVariance',
+  'targetVerticalOscillationAmplitude',
+  'targetVerticalOscillationSpeed',
   'spawnDistanceMin',
   'spawnDistanceMax',
   'targetLifetimeMin',
@@ -106,6 +109,9 @@ const DEFAULT_SETTINGS = {
   targetCount: 8,
   targetRadius: 0.45,
   targetMaxHealth: 12,
+  targetSpawnYVariance: 1.11,
+  targetVerticalOscillationAmplitude: 0,
+  targetVerticalOscillationSpeed: 1.5,
   spawnDistanceMin: 4,
   spawnDistanceMax: 36,
   targetLifetimeMin: 6,
@@ -144,6 +150,10 @@ const state = {
   recoilShotIndex: 0,
   recoilPatternX: 0,
   recoilPatternY: 0
+};
+
+const audioState = {
+  context: null
 };
 
 const app = document.querySelector('#app');
@@ -270,6 +280,30 @@ app.innerHTML = `
       max: 5,
       step: 0.05,
       value: SETTINGS.targetHorizontalSpeedMax
+    })}
+    ${renderNumericControl({
+      id: 'target-spawn-y-variance',
+      label: 'Target Y spawn variance',
+      min: 0,
+      max: 3,
+      step: 0.05,
+      value: SETTINGS.targetSpawnYVariance
+    })}
+    ${renderNumericControl({
+      id: 'target-vertical-oscillation-amplitude',
+      label: 'Target Y oscillation amp.',
+      min: 0,
+      max: 3,
+      step: 0.05,
+      value: SETTINGS.targetVerticalOscillationAmplitude
+    })}
+    ${renderNumericControl({
+      id: 'target-vertical-oscillation-speed',
+      label: 'Target Y oscillation speed',
+      min: 0,
+      max: 6,
+      step: 0.05,
+      value: SETTINGS.targetVerticalOscillationSpeed
     })}
     <label class="control-group" for="response-curve-input">
       <span>Response curve</span>
@@ -414,6 +448,7 @@ const floor = new THREE.Mesh(
   new THREE.MeshStandardMaterial({ color: 0x1c2438, roughness: 0.75 })
 );
 floor.rotation.x = -Math.PI / 2;
+floor.position.y = -0.12;
 floor.position.z = -64;
 floor.receiveShadow = true;
 scene.add(floor);
@@ -499,6 +534,9 @@ window.addEventListener('keyup', (event) => {
   }
   keyboard.delete(event.code);
 });
+
+window.addEventListener('pointerdown', unlockAudioOnInteraction, { passive: true });
+window.addEventListener('keydown', unlockAudioOnInteraction);
 
 window.addEventListener('resize', () => {
   camera.aspect = window.innerWidth / window.innerHeight;
@@ -629,6 +667,37 @@ bindNumericSetting({
       SETTINGS.targetHorizontalSpeedMin = value;
       setNumericControlValue('target-speed-min', value);
     }
+  }
+});
+
+bindNumericSetting({
+  id: 'target-spawn-y-variance',
+  min: 0,
+  max: 3,
+  fallback: DEFAULT_SETTINGS.targetSpawnYVariance,
+  onChange: (value) => {
+    SETTINGS.targetSpawnYVariance = value;
+    resetTargets();
+  }
+});
+
+bindNumericSetting({
+  id: 'target-vertical-oscillation-amplitude',
+  min: 0,
+  max: 3,
+  fallback: DEFAULT_SETTINGS.targetVerticalOscillationAmplitude,
+  onChange: (value) => {
+    SETTINGS.targetVerticalOscillationAmplitude = value;
+  }
+});
+
+bindNumericSetting({
+  id: 'target-vertical-oscillation-speed',
+  min: 0,
+  max: 6,
+  fallback: DEFAULT_SETTINGS.targetVerticalOscillationSpeed,
+  onChange: (value) => {
+    SETTINGS.targetVerticalOscillationSpeed = value;
   }
 });
 
@@ -1118,6 +1187,7 @@ function createTarget() {
   target.userData.widthScale = 1;
   target.userData.bodyHeightScale = 1.45;
   target.userData.feetClearance = 0.04;
+  target.userData.verticalOscillationPhase = 0;
   target.userData.material = material;
   target.userData.totalHeight = TARGET_BODY_BASE_HEIGHT + TARGET_HEAD_RADIUS * 2;
 
@@ -1128,6 +1198,7 @@ function applyHitToTarget(target) {
   state.hits += 1;
   state.score += 25;
   target.userData.health -= 1;
+  playHitTickSound();
 
   if (target.userData.health <= 0) {
     respawnTarget(target);
@@ -1140,25 +1211,30 @@ function applyHitToTarget(target) {
 function respawnTarget(target) {
   const distance = randomRange(SETTINGS.spawnDistanceMin, SETTINGS.spawnDistanceMax);
   const spawnBoxHalfWidth = (backWall.geometry.parameters.width * 0.32) / 2;
+  const spawnBoxCenterX = camera.position.x;
   const worldPosition = new THREE.Vector3(
-    camera.position.x + spawnBoxHalfWidth,
+    randomRange(spawnBoxCenterX - spawnBoxHalfWidth, spawnBoxCenterX + spawnBoxHalfWidth),
     camera.position.y,
     camera.position.z - distance
   );
   if (Math.random() < 0.3) {
     worldPosition.y = target.userData.feetClearance;
   } else {
-    worldPosition.y = randomRange(target.userData.feetClearance, 1.15);
+    worldPosition.y = randomRange(
+      target.userData.feetClearance,
+      target.userData.feetClearance + SETTINGS.targetSpawnYVariance
+    );
   }
 
   const moveSpeed = getRandomTargetMoveSpeed();
-  const horizontalVelocity = getHorizontalVelocity(moveSpeed);
+  const horizontalVelocity = getHorizontalVelocity(moveSpeed, worldPosition.x, spawnBoxCenterX);
 
   target.userData.basePosition.copy(worldPosition);
   target.userData.horizontalVelocity.copy(horizontalVelocity);
   target.userData.moveSpeed = moveSpeed;
   target.userData.age = 0;
   target.userData.lifetime = randomRange(SETTINGS.targetLifetimeMin, SETTINGS.targetLifetimeMax);
+  target.userData.verticalOscillationPhase = randomRange(0, Math.PI * 2);
   target.userData.health = target.userData.maxHealth;
   target.userData.widthScale = randomRange(0.92, 1.12);
   target.userData.bodyHeightScale = randomRange(1.2, 1.55);
@@ -1175,7 +1251,7 @@ function respawnTarget(target) {
   target.userData.head.position.y =
     TARGET_BODY_BASE_HEIGHT * target.userData.bodyHeightScale + TARGET_HEAD_RADIUS * target.userData.widthScale;
 
-  target.position.copy(worldPosition);
+  updateTargetPosition(target);
 
   applyTargetHealthVisuals(target);
 }
@@ -1184,8 +1260,27 @@ function getRandomTargetMoveSpeed() {
   return randomRange(SETTINGS.targetHorizontalSpeedMin, SETTINGS.targetHorizontalSpeedMax);
 }
 
-function getHorizontalVelocity(moveSpeed) {
-  return new THREE.Vector3(-moveSpeed, 0, 0);
+function getHorizontalVelocity(moveSpeed, spawnX, centerX) {
+  return new THREE.Vector3(spawnX >= centerX ? -moveSpeed : moveSpeed, 0, 0);
+}
+
+function getTargetVerticalOffset(target) {
+  if (SETTINGS.targetVerticalOscillationAmplitude <= 0 || SETTINGS.targetVerticalOscillationSpeed <= 0) {
+    return 0;
+  }
+
+  return (
+    Math.sin(target.userData.age * SETTINGS.targetVerticalOscillationSpeed + target.userData.verticalOscillationPhase) *
+    SETTINGS.targetVerticalOscillationAmplitude
+  );
+}
+
+function updateTargetPosition(target) {
+  target.position.copy(target.userData.basePosition);
+  target.position.y = Math.max(
+    target.userData.basePosition.y + getTargetVerticalOffset(target),
+    target.userData.feetClearance
+  );
 }
 
 function resetTargets() {
@@ -1206,7 +1301,7 @@ function updateTargets(delta) {
     target.userData.age += delta;
     target.userData.basePosition.addScaledVector(target.userData.horizontalVelocity, delta);
     target.userData.basePosition.y = Math.max(target.userData.basePosition.y, target.userData.feetClearance);
-    target.position.copy(target.userData.basePosition);
+    updateTargetPosition(target);
 
     if (target.userData.age >= target.userData.lifetime) {
       respawnTarget(target);
@@ -1573,6 +1668,73 @@ function getResponseCurveLabel(value) {
   return RESPONSE_CURVE_OPTIONS.find((option) => option.value === value)?.label ?? 'Linear';
 }
 
+function getAudioContext() {
+  if (audioState.context) {
+    return audioState.context;
+  }
+
+  const AudioContextCtor = window.AudioContext ?? window.webkitAudioContext;
+  if (!AudioContextCtor) {
+    return null;
+  }
+
+  audioState.context = new AudioContextCtor();
+  return audioState.context;
+}
+
+async function ensureAudioReady() {
+  const context = getAudioContext();
+  if (!context) {
+    return null;
+  }
+
+  if (context.state === 'suspended') {
+    await context.resume();
+  }
+
+  return context.state === 'running' ? context : null;
+}
+
+function unlockAudioOnInteraction() {
+  void ensureAudioReady();
+}
+
+function playHitTickSound() {
+  const context = getAudioContext();
+  if (!context || context.state !== 'running') {
+    return;
+  }
+
+  const now = context.currentTime;
+  const oscillator = context.createOscillator();
+  const filter = context.createBiquadFilter();
+  const gain = context.createGain();
+
+  oscillator.type = 'triangle';
+  oscillator.frequency.setValueAtTime(1500, now);
+  oscillator.frequency.exponentialRampToValueAtTime(950, now + 0.05);
+
+  filter.type = 'bandpass';
+  filter.frequency.setValueAtTime(1200, now);
+  filter.Q.value = 2.5;
+
+  gain.gain.setValueAtTime(0.0001, now);
+  gain.gain.exponentialRampToValueAtTime(0.015, now + 0.004);
+  gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.05);
+
+  oscillator.connect(filter);
+  filter.connect(gain);
+  gain.connect(context.destination);
+
+  oscillator.start(now);
+  oscillator.stop(now + 0.055);
+  oscillator.addEventListener('ended', () => {
+    oscillator.disconnect();
+    filter.disconnect();
+    gain.disconnect();
+  });
+}
+
 function sanitizeResponseCurve(value) {
   return RESPONSE_CURVE_OPTIONS.some((option) => option.value === value) ? value : DEFAULT_SETTINGS.responseCurve;
 }
@@ -1769,6 +1931,19 @@ function sanitizeGameSettings(rawSettings) {
     targetCount: clampSetting(rawSettings.targetCount, 1, 32, DEFAULT_SETTINGS.targetCount),
     targetRadius: clampSetting(rawSettings.targetRadius, 0.1, 2, DEFAULT_SETTINGS.targetRadius),
     targetMaxHealth: clampSetting(rawSettings.targetMaxHealth, 1, 100, DEFAULT_SETTINGS.targetMaxHealth),
+    targetSpawnYVariance: clampSetting(rawSettings.targetSpawnYVariance, 0, 3, DEFAULT_SETTINGS.targetSpawnYVariance),
+    targetVerticalOscillationAmplitude: clampSetting(
+      rawSettings.targetVerticalOscillationAmplitude,
+      0,
+      3,
+      DEFAULT_SETTINGS.targetVerticalOscillationAmplitude
+    ),
+    targetVerticalOscillationSpeed: clampSetting(
+      rawSettings.targetVerticalOscillationSpeed,
+      0,
+      6,
+      DEFAULT_SETTINGS.targetVerticalOscillationSpeed
+    ),
     spawnDistanceMin: clampSetting(rawSettings.spawnDistanceMin, 1, 60, DEFAULT_SETTINGS.spawnDistanceMin),
     spawnDistanceMax: clampSetting(rawSettings.spawnDistanceMax, 1, 120, DEFAULT_SETTINGS.spawnDistanceMax),
     targetLifetimeMin: clampSetting(rawSettings.targetLifetimeMin, 1, 60, DEFAULT_SETTINGS.targetLifetimeMin),
@@ -1862,6 +2037,7 @@ function handleGameProfileSelection(selectedValue) {
   profileState.selectedGameProfileId = selectedValue;
   profileState.selectedGunProfileId = Object.keys(getCurrentGameProfile().gunProfiles)[0];
   syncProfileUi();
+  resetTargets();
   storeSettings();
 }
 
@@ -1902,6 +2078,7 @@ function createGameProfileFromPrompt() {
   profileState.selectedGameProfileId = gameId;
   profileState.selectedGunProfileId = gunId;
   syncProfileUi();
+  resetTargets();
   storeSettings();
 }
 
@@ -1955,6 +2132,9 @@ function syncSettingControls() {
   setNumericControlValue('ads-snap', SETTINGS.adsSnap);
   setNumericControlValue('target-speed-min', SETTINGS.targetHorizontalSpeedMin);
   setNumericControlValue('target-speed-max', SETTINGS.targetHorizontalSpeedMax);
+  setNumericControlValue('target-spawn-y-variance', SETTINGS.targetSpawnYVariance);
+  setNumericControlValue('target-vertical-oscillation-amplitude', SETTINGS.targetVerticalOscillationAmplitude);
+  setNumericControlValue('target-vertical-oscillation-speed', SETTINGS.targetVerticalOscillationSpeed);
   setNumericControlValue('recoil-y-strength', SETTINGS.recoilYStrength);
   setNumericControlValue('recoil-variance', SETTINGS.recoilVariance);
   setNumericControlValue('recoil-horizontal-oscillation', SETTINGS.recoilHorizontalOscillationStrength);

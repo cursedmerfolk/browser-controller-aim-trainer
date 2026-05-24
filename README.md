@@ -10,11 +10,11 @@ The app uses:
 - Keyboard fallback controls for testing without a controller
 - Game and gun setting profiles with selectable dropdowns and create-new prompts
 - Live controller tuning controls for sensitivity, deadzone, FOV, invert-Y, and response curves
-- Live projectile-rate, aim-assist, min/max target-speed, and recoil tuning controls with keyboard-editable numeric inputs
+- Live projectile-rate, aim-assist, min/max target-speed, target Y spawn variance, target Y oscillation, and recoil tuning controls with keyboard-editable numeric inputs
 - ADS with a simple rifle viewmodel, tighter aim handling, and automatic fire
 - Four aim-assist controls: bullet magnetism, aim slow, aim stickiness, and ADS snap
 - A toggle for showing or hiding the aim-assist debug shapes
-- Moving multi-hit targets that shift from green to red as they take damage
+- Moving multi-hit targets that shift from green to red as they take damage, including optional sinusoidal Y motion
 - VS Code Dev Containers for a reproducible development environment
 
 ## Getting started in VS Code Dev Containers
@@ -41,7 +41,7 @@ The proof of concept is ready when the browser shows:
 - a rifle-like held weapon in first person
 - a dynamic tick-mark crosshair that tightens when aiming down sights
 - score, hits, shots, accuracy, and raw stick values in the HUD
-- a controller settings panel with game profile and gun profile selectors, plus sensitivity, deadzone, FOV, projectile rate, bullet magnetism, aim slow, aim stickiness, ADS snap, min target speed, max target speed, recoil Y strength, recoil variance, recoil horizontal oscillation, recoil horizontal oscillation speed, recoil intensity oscillator, recoil intensity oscillator speed, invert-Y, show debug shapes, and response curves
+- a controller settings panel with game profile and gun profile selectors, plus sensitivity, deadzone, FOV, projectile rate, bullet magnetism, aim slow, aim stickiness, ADS snap, min target speed, max target speed, target Y spawn variance, target Y oscillation amplitude, target Y oscillation speed, recoil Y strength, recoil variance, recoil horizontal oscillation, recoil horizontal oscillation speed, recoil intensity oscillator, recoil intensity oscillator speed, invert-Y, show debug shapes, and response curves
 - keyboard fallback aiming and shooting if no controller is connected
 
 ## Local scripts
@@ -70,3 +70,5 @@ Keyboard fallback:
 The app reads controller state with `navigator.getGamepads()` once per animation frame. Some browsers only expose a controller after a button is pressed, so press a button if the HUD does not immediately show your controller.
 
 Chrome and Edge are usually the easiest browsers to start with for Gamepad API testing.
+
+Browsers typically require one click or key press before Web Audio can play, so interact with the page once if you do not hear the target hit tick immediately.
