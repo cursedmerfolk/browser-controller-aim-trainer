@@ -41,7 +41,8 @@ The proof of concept is ready when the browser shows:
 - visible projectile tracers that animate even though hits are resolved immediately
 - a rifle-like held weapon in first person
 - a dynamic tick-mark crosshair that tightens when aiming down sights
-- score, hits, misses, accuracy, health, FPS, and raw stick values in the HUD
+- score, hits, misses, accuracy, 50 health, FPS, and raw stick values in the HUD
+- a centered game-over screen with Restart button support
 - a controller settings panel with game profile and gun profile selectors, plus sensitivity, mouse sensitivity, deadzone, FOV, FPS max, projectile rate, bullet magnetism, aim slow, aim stickiness, ADS snap, min target speed, max target speed, target Y spawn variance, target Y oscillation amplitude, target Y oscillation speed, recoil Y strength, recoil variance, recoil horizontal oscillation, recoil horizontal oscillation speed, recoil intensity oscillator, recoil intensity oscillator speed, invert-Y, show debug shapes, and response curves
 - mouse-look desktop controls with no auto aim, plus keyboard fallback strafing/shooting
 
@@ -60,13 +61,16 @@ Controller:
 - Left stick: strafe left/right
 - Left trigger / L2: aim down sights
 - Right trigger / R2: fire
+- Start: restart after game over
 
 Mouse and keyboard:
 
 - Click the game view: capture mouse aim
 - A / D or left / right arrows: strafe left/right
 - Left click or Space: fire
-- Right click or Shift: aim down sights
+- Right click: toggle aim down sights
+- Shift: hold aim down sights
+- Enter: restart after game over
 
 ## Browser notes
 

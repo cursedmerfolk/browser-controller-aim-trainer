@@ -21,7 +21,7 @@ const TARGET_HEAD_RADIUS = 0.18;
 const BODY_SHOT_DAMAGE = 1;
 const HEAD_SHOT_DAMAGE = 1.5;
 const PLAYER_EYE_HEIGHT = 2.2;
-const PLAYER_MAX_HEALTH = 5;
+const PLAYER_MAX_HEALTH = 50;
 const PLAYER_STRAFE_SPEED = 12;
 const TARGET_FIRE_INTERVAL_MIN = 1.4;
 const TARGET_FIRE_INTERVAL_MAX = 2.6;
@@ -162,10 +162,11 @@ const state = {
   pendingMouseLookX: 0,
   pendingMouseLookY: 0,
   mouseShootPressed: false,
-  mouseAdsPressed: false,
+  mouseAdsToggled: false,
   damageFlash: 0,
   damageFlinch: 0,
   damageFlinchDirection: 1,
+  restartPressedLastFrame: false,
   playerVelocity: new THREE.Vector3(),
   isAimingDownSights: false,
   aimBlend: 0,
@@ -219,6 +220,16 @@ app.innerHTML = `
     <span class="crosshair-tick crosshair-tick-left"></span>
   </div>
   <div class="damage-overlay" id="damage-overlay" aria-hidden="true"></div>
+  <div class="game-over-overlay" id="game-over-overlay" aria-live="assertive" aria-hidden="true">
+    <div class="game-over-card">
+      <strong>Game Over</strong>
+      <div>You ran out of health.</div>
+      <div class="button-row">
+        <button id="game-over-restart-button" type="button">Restart</button>
+      </div>
+      <div class="game-over-hint">Press Start, Enter, or Restart</div>
+    </div>
+  </div>
   <div class="hud-panel axis-legend" aria-live="polite">
     <strong>World axes</strong>
     <div>X+: right | X-: left</div>
@@ -458,7 +469,7 @@ app.innerHTML = `
       <div>Left stick / A-D / left-right arrows: strafe</div>
       <div>Left trigger / L2: aim down sights</div>
       <div>Left click / Space / Right trigger / R2: fire continuously</div>
-      <div>Right click / Shift: aim down sights</div>
+      <div>Right click: toggle aim down sights | Shift: hold aim down sights</div>
       <div>Targets strafe, shoot at your last seen position, and despawn after a short time.</div>
       <div class="button-row">
         <button id="discover-controller-button" type="button">Discover controller</button>
@@ -553,6 +564,7 @@ const hudElements = {
   rawStick: document.querySelector('#raw-stick'),
   crosshair: document.querySelector('#crosshair'),
   damageOverlay: document.querySelector('#damage-overlay'),
+  gameOverOverlay: document.querySelector('#game-over-overlay'),
   hudPanel: document.querySelector('#hud-panel'),
   settingsPanel: document.querySelector('#settings-panel'),
   controlsPanel: document.querySelector('#controls-panel'),
@@ -562,7 +574,8 @@ const hudElements = {
   invertYInput: document.querySelector('#invert-y-input'),
   showDebugShapesInput: document.querySelector('#show-debug-shapes-input'),
   discoverControllerButton: document.querySelector('#discover-controller-button'),
-  resetButton: document.querySelector('#reset-button')
+  resetButton: document.querySelector('#reset-button'),
+  gameOverRestartButton: document.querySelector('#game-over-restart-button')
 };
 
 window.addEventListener('gamepadconnected', (event) => {
@@ -587,17 +600,13 @@ renderer.domElement.addEventListener('mousedown', (event) => {
   }
 
   if (event.button === 2) {
-    state.mouseAdsPressed = true;
+    state.mouseAdsToggled = !state.mouseAdsToggled;
   }
 });
 
 window.addEventListener('mouseup', (event) => {
   if (event.button === 0) {
     state.mouseShootPressed = false;
-  }
-
-  if (event.button === 2) {
-    state.mouseAdsPressed = false;
   }
 });
 
@@ -617,7 +626,6 @@ document.addEventListener('pointerlockchange', () => {
 
   state.pendingMouseLookX = 0;
   state.pendingMouseLookY = 0;
-  state.mouseAdsPressed = false;
 });
 
 renderer.domElement.addEventListener('contextmenu', (event) => {
@@ -647,7 +655,7 @@ window.addEventListener('resize', () => {
   renderer.setSize(window.innerWidth, window.innerHeight);
 });
 
-hudElements.resetButton.addEventListener('click', () => {
+function restartGame() {
   state.score = 0;
   state.shots = 0;
   state.hits = 0;
@@ -665,16 +673,20 @@ hudElements.resetButton.addEventListener('click', () => {
   state.pendingMouseLookX = 0;
   state.pendingMouseLookY = 0;
   state.mouseShootPressed = false;
-  state.mouseAdsPressed = false;
+  state.mouseAdsToggled = false;
   state.damageFlash = 0;
   state.damageFlinch = 0;
+  state.restartPressedLastFrame = false;
   camera.position.set(0, PLAYER_EYE_HEIGHT, 0);
   previousCameraOrigin.copy(camera.position);
   updateCamera();
   resetTargets();
   clearProjectiles();
   clearEnemyProjectiles();
-});
+}
+
+hudElements.resetButton.addEventListener('click', restartGame);
+hudElements.gameOverRestartButton.addEventListener('click', restartGame);
 
 hudElements.discoverControllerButton.addEventListener('click', () => {
   discoverController(true);
@@ -943,6 +955,10 @@ function loop(frameTime = 0) {
   state.lastFrameTime = frameTime;
   state.fps = delta > 0 ? (1 / delta) : 0;
   const input = getInputState();
+  if (state.isGameOver && input.restartPressed && !state.restartPressedLastFrame) {
+    restartGame();
+  }
+  state.restartPressedLastFrame = input.restartPressed;
   const directAimTarget = input.allowAimAssist ? getDirectAimTarget() : null;
 
   updateAimState(delta, input.adsPressed, input.shootPressed);
@@ -973,7 +989,8 @@ function getInputState() {
   let controllerLookY = 0;
   let moveX = 0;
   let shootPressed = keyboard.has('Space') || state.mouseShootPressed;
-  let adsPressed = keyboard.has('ShiftLeft') || keyboard.has('ShiftRight') || state.mouseAdsPressed;
+  let adsPressed = keyboard.has('ShiftLeft') || keyboard.has('ShiftRight') || state.mouseAdsToggled;
+  let restartPressed = keyboard.has('Enter');
   let usingGamepad = false;
   const usingMouseAim = document.pointerLockElement === renderer.domElement;
 
@@ -988,6 +1005,7 @@ function getInputState() {
     moveX += processStickAxis(pad.axes[0] ?? 0);
     shootPressed = shootPressed || getGamepadShootPressed(pad);
     adsPressed = adsPressed || getGamepadAdsPressed(pad);
+    restartPressed = restartPressed || getGamepadRestartPressed(pad);
   } else {
     state.rawStickX = 0;
     state.rawStickY = 0;
@@ -1009,6 +1027,7 @@ function getInputState() {
     moveX: THREE.MathUtils.clamp(moveX, -1, 1),
     shootPressed,
     adsPressed,
+    restartPressed,
     usingGamepad,
     usingMouseAim,
     allowAimAssist: usingGamepad && !usingMouseAim
@@ -1855,6 +1874,8 @@ function updateHud() {
   hudElements.score.textContent = `Score: ${state.score}`;
   hudElements.status.textContent = state.isGameOver ? 'Status: LOST - press Restart' : 'Status: READY';
   hudElements.rawStick.textContent = `Raw stick: X ${state.rawStickX.toFixed(2)} | Y ${state.rawStickY.toFixed(2)}`;
+  hudElements.gameOverOverlay.classList.toggle('is-visible', state.isGameOver);
+  hudElements.gameOverOverlay.setAttribute('aria-hidden', String(!state.isGameOver));
 }
 
 function bindNumericSetting({ id, min, max, fallback, onChange }) {
@@ -1968,20 +1989,38 @@ function getAxisTriggerValue(axisValue) {
 }
 
 function getGamepadShootPressed(pad) {
+  const alternateAxisTrigger =
+    pad.mapping === 'standard'
+      ? 0
+      : Math.max(getAxisTriggerValue(pad.axes[2]), getAxisTriggerValue(pad.axes[5]));
+
   return (
     getButtonValue(pad.buttons[7]) > 0.05 ||
     getButtonValue(pad.buttons[5]) > 0.05 ||
     getButtonValue(pad.buttons[0]) > 0.05 ||
-    getAxisTriggerValue(pad.axes[5]) > 0.55
+    getButtonValue(pad.buttons[1]) > 0.05 ||
+    getAxisTriggerValue(pad.axes[5]) > 0.55 ||
+    alternateAxisTrigger > 0.55
   );
 }
 
 function getGamepadAdsPressed(pad) {
+  const alternateAxisTrigger =
+    pad.mapping === 'standard'
+      ? 0
+      : Math.max(getAxisTriggerValue(pad.axes[1]), getAxisTriggerValue(pad.axes[4]));
+
   return (
     getButtonValue(pad.buttons[6]) > 0.05 ||
     getButtonValue(pad.buttons[4]) > 0.05 ||
-    getAxisTriggerValue(pad.axes[4]) > 0.55
+    getButtonValue(pad.buttons[2]) > 0.05 ||
+    getAxisTriggerValue(pad.axes[4]) > 0.55 ||
+    alternateAxisTrigger > 0.55
   );
+}
+
+function getGamepadRestartPressed(pad) {
+  return getButtonValue(pad.buttons[9]) > 0.05 || getButtonValue(pad.buttons[8]) > 0.05;
 }
 
 function randomRange(min, max) {

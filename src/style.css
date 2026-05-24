@@ -113,6 +113,51 @@ canvas {
   pointer-events: none;
 }
 
+.damage-overlay {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  background: rgba(255, 32, 32, 1);
+  opacity: 0;
+  transition: opacity 50ms linear;
+}
+
+.game-over-overlay {
+  position: fixed;
+  inset: 0;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: rgba(4, 7, 16, 0.5);
+  z-index: 20;
+}
+
+.game-over-overlay.is-visible {
+  display: flex;
+}
+
+.game-over-card {
+  display: grid;
+  gap: 12px;
+  min-width: min(320px, calc(100vw - 48px));
+  padding: 22px 24px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 14px;
+  background: rgba(8, 12, 24, 0.92);
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.38);
+  text-align: center;
+}
+
+.game-over-card strong {
+  font-size: 28px;
+}
+
+.game-over-hint {
+  font-size: 13px;
+  opacity: 0.82;
+}
+
 .crosshair-dot,
 .crosshair-tick {
   position: absolute;
