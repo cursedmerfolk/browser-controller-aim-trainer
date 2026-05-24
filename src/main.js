@@ -22,7 +22,6 @@ const BODY_SHOT_DAMAGE = 1;
 const HEAD_SHOT_DAMAGE = 1.5;
 const PLAYER_EYE_HEIGHT = 2.2;
 const PLAYER_MAX_HEALTH = 50;
-const PLAYER_STRAFE_SPEED = 12;
 const PLAYER_STRAFE_ACCELERATION = 14;
 const PLAYER_STRAFE_DECELERATION = 12;
 const TARGET_FIRE_INTERVAL_MIN = 1.4;
@@ -31,7 +30,8 @@ const TARGET_PROJECTILES_PER_BURST = 2;
 const TARGET_PROJECTILE_BURST_SPREAD = 0.35;
 const TARGET_PROJECTILE_DAMAGE = 1;
 const TARGET_PROJECTILE_HIT_RADIUS = 0.4;
-const TARGET_PROJECTILE_SPEED = 54;
+const TARGET_PROJECTILE_SPEED = 72;
+const TARGET_SPAWN_WIDTH_FACTOR = 0.14;
 const CENTER_SCREEN = new THREE.Vector2(0, 0);
 const BULLET_MAGNETISM_CONE_ANGLE = THREE.MathUtils.degToRad(1);
 const ADS_SNAP_CYLINDER_RADIUS = 1;
@@ -59,6 +59,7 @@ const LEGACY_SETTINGS_ORDER = [
 const GAME_SETTING_KEYS = [
   'lookSensitivity',
   'mouseSensitivity',
+  'maxStrafeSpeed',
   'deadzone',
   'invertY',
   'fov',
@@ -76,6 +77,8 @@ const GAME_SETTING_KEYS = [
   'targetSpawnYVariance',
   'targetVerticalOscillationAmplitude',
   'targetVerticalOscillationSpeed',
+  'targetStrafeAmount',
+  'targetStrafeOscillationSpeed',
   'spawnDistanceMin',
   'spawnDistanceMax',
   'targetLifetimeMin',
@@ -105,6 +108,7 @@ const GUN_SETTING_KEYS = [
 const DEFAULT_SETTINGS = {
   lookSensitivity: 2.8,
   mouseSensitivity: 0.22,
+  maxStrafeSpeed: 10.5,
   deadzone: 0.12,
   invertY: false,
   fov: 110,
@@ -130,6 +134,8 @@ const DEFAULT_SETTINGS = {
   targetSpawnYVariance: 1.11,
   targetVerticalOscillationAmplitude: 0,
   targetVerticalOscillationSpeed: 1.5,
+  targetStrafeAmount: 0.9,
+  targetStrafeOscillationSpeed: 1.8,
   spawnDistanceMin: 4,
   spawnDistanceMax: 36,
   targetLifetimeMin: 6,
@@ -280,6 +286,14 @@ app.innerHTML = `
       value: SETTINGS.mouseSensitivity
     })}
     ${renderNumericControl({
+      id: 'max-strafe-speed',
+      label: 'Max strafe speed',
+      min: 1,
+      max: 20,
+      step: 0.1,
+      value: SETTINGS.maxStrafeSpeed
+    })}
+    ${renderNumericControl({
       id: 'deadzone',
       label: 'Deadzone',
       min: 0,
@@ -366,6 +380,22 @@ app.innerHTML = `
       max: 6,
       step: 0.05,
       value: SETTINGS.targetVerticalOscillationSpeed
+    })}
+    ${renderNumericControl({
+      id: 'target-strafe-amount',
+      label: 'Target strafe amount',
+      min: 0,
+      max: 3,
+      step: 0.05,
+      value: SETTINGS.targetStrafeAmount
+    })}
+    ${renderNumericControl({
+      id: 'target-strafe-oscillation-speed',
+      label: 'Target strafe zigzag speed',
+      min: 0,
+      max: 6,
+      step: 0.05,
+      value: SETTINGS.targetStrafeOscillationSpeed
     })}
     <label class="control-group" for="response-curve-input">
       <span>Response curve</span>
@@ -731,6 +761,16 @@ bindNumericSetting({
 });
 
 bindNumericSetting({
+  id: 'max-strafe-speed',
+  min: 1,
+  max: 20,
+  fallback: DEFAULT_SETTINGS.maxStrafeSpeed,
+  onChange: (value) => {
+    SETTINGS.maxStrafeSpeed = value;
+  }
+});
+
+bindNumericSetting({
   id: 'fov',
   min: 50,
   max: 110,
@@ -860,6 +900,26 @@ bindNumericSetting({
 });
 
 bindNumericSetting({
+  id: 'target-strafe-amount',
+  min: 0,
+  max: 3,
+  fallback: DEFAULT_SETTINGS.targetStrafeAmount,
+  onChange: (value) => {
+    SETTINGS.targetStrafeAmount = value;
+  }
+});
+
+bindNumericSetting({
+  id: 'target-strafe-oscillation-speed',
+  min: 0,
+  max: 6,
+  fallback: DEFAULT_SETTINGS.targetStrafeOscillationSpeed,
+  onChange: (value) => {
+    SETTINGS.targetStrafeOscillationSpeed = value;
+  }
+});
+
+bindNumericSetting({
   id: 'recoil-y-strength',
   min: 0.05,
   max: 2.5,
@@ -972,14 +1032,17 @@ function loop(frameTime = 0) {
   updateAimState(delta, input.adsPressed, input.shootPressed);
   applyPlayerMovement(input.moveX, delta);
   applyLookInput(input.controllerLookX, input.controllerLookY, delta, aimSlowTarget, input.controllerAimAssistActive);
+  updateCamera();
+  if (input.controllerAimAssistActive && !state.isGameOver) {
+    applyAimAssist(delta);
+    updateCamera();
+  }
   applyMouseLookInput(input.mouseLookX, input.mouseLookY);
   updateCamera();
   updatePlayerVelocity(delta);
-  const firedThisFrame = state.isGameOver ? false : updateFiring(delta, input.shootPressed, input.controllerAimAssistActive);
-  if (!firedThisFrame && input.controllerAimAssistActive && !state.isGameOver) {
-    applyAimAssist(delta);
+  if (!state.isGameOver) {
+    updateFiring(delta, input.shootPressed, input.controllerAimAssistActive);
   }
-  updateCamera();
   updateAimAssistDebugVisuals();
   updateWeaponTransform();
   updateTargets(delta);
@@ -1163,7 +1226,7 @@ function isAdsSnapActive() {
 }
 
 function applyPlayerMovement(moveX, delta) {
-  const targetVelocityX = moveX * PLAYER_STRAFE_SPEED;
+  const targetVelocityX = moveX * SETTINGS.maxStrafeSpeed;
   const acceleration =
     Math.abs(targetVelocityX) > Math.abs(state.strafeVelocityX) ? PLAYER_STRAFE_ACCELERATION : PLAYER_STRAFE_DECELERATION;
   state.strafeVelocityX = THREE.MathUtils.damp(state.strafeVelocityX, targetVelocityX, acceleration, delta);
@@ -1211,7 +1274,7 @@ function updateFiring(delta, shootPressed, allowAimAssist) {
   let firedShots = 0;
 
   while (state.fireCooldown <= 0 && remainingShots > 0) {
-    fireShot(delta, allowAimAssist);
+    fireShot(allowAimAssist);
     state.fireCooldown += shotInterval;
     remainingShots -= 1;
     firedShots += 1;
@@ -1220,7 +1283,7 @@ function updateFiring(delta, shootPressed, allowAimAssist) {
   return firedShots > 0;
 }
 
-function fireShot(delta, allowAimAssist) {
+function fireShot(allowAimAssist) {
   state.shots += 1;
 
   const recoilPoint = getRecoilPoint(state.recoilShotIndex);
@@ -1239,9 +1302,6 @@ function fireShot(delta, allowAimAssist) {
     0,
     2
   );
-  if (allowAimAssist) {
-    applyAimAssist(delta);
-  }
   applyAimRecoil(recoilPoint);
   updateCamera();
 
@@ -1516,6 +1576,9 @@ function createTarget() {
   target.userData.lifetime = SETTINGS.targetLifetimeMax;
   target.userData.body = body;
   target.userData.head = head;
+  target.userData.fireIntervalScale = randomRange(0.8, 1.3);
+  target.userData.fireIntervalJitter = randomRange(0.15, 0.85);
+  target.userData.strafePhase = 0;
   target.userData.widthScale = 1;
   target.userData.bodyHeightScale = 1.45;
   target.userData.feetClearance = 0.04;
@@ -1543,7 +1606,7 @@ function applyHitToTarget(target, isHeadshot = false) {
 
 function respawnTarget(target) {
   const distance = randomRange(SETTINGS.spawnDistanceMin, SETTINGS.spawnDistanceMax);
-  const spawnBoxHalfWidth = (backWall.geometry.parameters.width * 0.32) / 2;
+  const spawnBoxHalfWidth = (backWall.geometry.parameters.width * TARGET_SPAWN_WIDTH_FACTOR) / 2;
   const spawnBoxCenterX = camera.position.x;
   const worldPosition = new THREE.Vector3(
     randomRange(spawnBoxCenterX - spawnBoxHalfWidth, spawnBoxCenterX + spawnBoxHalfWidth),
@@ -1568,7 +1631,8 @@ function respawnTarget(target) {
   target.userData.age = 0;
   target.userData.lifetime = randomRange(SETTINGS.targetLifetimeMin, SETTINGS.targetLifetimeMax);
   target.userData.verticalOscillationPhase = randomRange(0, Math.PI * 2);
-  target.userData.fireCooldown = randomRange(TARGET_FIRE_INTERVAL_MIN, TARGET_FIRE_INTERVAL_MAX);
+  target.userData.fireCooldown = getNextTargetFireCooldown(target, true);
+  target.userData.strafePhase = randomRange(0, Math.PI * 2);
   target.userData.health = target.userData.maxHealth;
   target.userData.widthScale = randomRange(0.92, 1.12);
   target.userData.bodyHeightScale = randomRange(1.2, 1.55);
@@ -1611,10 +1675,25 @@ function getTargetVerticalOffset(target) {
 
 function updateTargetPosition(target) {
   target.position.copy(target.userData.basePosition);
+  applyTargetStrafeOffset(target);
   target.position.y = Math.max(
-    target.userData.basePosition.y + getTargetVerticalOffset(target),
+    target.position.y + getTargetVerticalOffset(target),
     target.userData.feetClearance
   );
+}
+
+function applyTargetStrafeOffset(target) {
+  const playerPosition = camera.position;
+  const relativePosition = target.userData.basePosition.clone().sub(playerPosition).setY(0);
+  if (relativePosition.lengthSq() <= 0.0001 || SETTINGS.targetStrafeAmount <= 0 || SETTINGS.targetStrafeOscillationSpeed <= 0) {
+    return;
+  }
+
+  const perpendicular = new THREE.Vector3(relativePosition.z, 0, -relativePosition.x).normalize();
+  const strafeOffset =
+    getTriangleWave(target.userData.age * SETTINGS.targetStrafeOscillationSpeed + target.userData.strafePhase) *
+    SETTINGS.targetStrafeAmount;
+  target.position.addScaledVector(perpendicular, strafeOffset);
 }
 
 function resetTargets() {
@@ -1643,7 +1722,7 @@ function updateTargets(delta) {
         const burstCenterOffset = burstIndex - (TARGET_PROJECTILES_PER_BURST - 1) / 2;
         fireTargetProjectile(target, burstCenterOffset * TARGET_PROJECTILE_BURST_SPREAD);
       }
-      target.userData.fireCooldown = randomRange(TARGET_FIRE_INTERVAL_MIN, TARGET_FIRE_INTERVAL_MAX);
+      target.userData.fireCooldown = getNextTargetFireCooldown(target);
     }
 
     if (target.userData.age >= target.userData.lifetime) {
@@ -2064,6 +2143,13 @@ function randomRange(min, max) {
   return min + Math.random() * (max - min);
 }
 
+function getNextTargetFireCooldown(target, isInitialSpawn = false) {
+  const baseInterval = randomRange(TARGET_FIRE_INTERVAL_MIN, TARGET_FIRE_INTERVAL_MAX) * target.userData.fireIntervalScale;
+  const jitter = randomRange(0, target.userData.fireIntervalJitter);
+  const initialDelay = isInitialSpawn ? randomRange(0, 1.1) : 0;
+  return baseInterval + jitter + initialDelay;
+}
+
 function isControlKey(code) {
   return [
     'ArrowLeft',
@@ -2339,6 +2425,7 @@ function sanitizeGameSettings(rawSettings) {
   return {
     lookSensitivity: clampSetting(rawSettings.lookSensitivity, 1, 10, DEFAULT_SETTINGS.lookSensitivity),
     mouseSensitivity: clampSetting(rawSettings.mouseSensitivity, 0.05, 1, DEFAULT_SETTINGS.mouseSensitivity),
+    maxStrafeSpeed: clampSetting(rawSettings.maxStrafeSpeed, 1, 20, DEFAULT_SETTINGS.maxStrafeSpeed),
     deadzone: clampSetting(rawSettings.deadzone, 0, 0.35, DEFAULT_SETTINGS.deadzone),
     invertY: typeof rawSettings.invertY === 'boolean' ? rawSettings.invertY : DEFAULT_SETTINGS.invertY,
     fov: clampSetting(rawSettings.fov, 50, 110, DEFAULT_SETTINGS.fov),
@@ -2366,6 +2453,13 @@ function sanitizeGameSettings(rawSettings) {
       0,
       6,
       DEFAULT_SETTINGS.targetVerticalOscillationSpeed
+    ),
+    targetStrafeAmount: clampSetting(rawSettings.targetStrafeAmount, 0, 3, DEFAULT_SETTINGS.targetStrafeAmount),
+    targetStrafeOscillationSpeed: clampSetting(
+      rawSettings.targetStrafeOscillationSpeed,
+      0,
+      6,
+      DEFAULT_SETTINGS.targetStrafeOscillationSpeed
     ),
     spawnDistanceMin: clampSetting(rawSettings.spawnDistanceMin, 1, 60, DEFAULT_SETTINGS.spawnDistanceMin),
     spawnDistanceMax: clampSetting(rawSettings.spawnDistanceMax, 1, 120, DEFAULT_SETTINGS.spawnDistanceMax),
@@ -2547,6 +2641,7 @@ function syncProfileSelectors() {
 function syncSettingControls() {
   setNumericControlValue('sensitivity', SETTINGS.lookSensitivity);
   setNumericControlValue('mouse-sensitivity', SETTINGS.mouseSensitivity);
+  setNumericControlValue('max-strafe-speed', SETTINGS.maxStrafeSpeed);
   setNumericControlValue('deadzone', SETTINGS.deadzone);
   setNumericControlValue('fov', SETTINGS.fov);
   setNumericControlValue('fps-max', SETTINGS.fpsMax);
@@ -2560,6 +2655,8 @@ function syncSettingControls() {
   setNumericControlValue('target-spawn-y-variance', SETTINGS.targetSpawnYVariance);
   setNumericControlValue('target-vertical-oscillation-amplitude', SETTINGS.targetVerticalOscillationAmplitude);
   setNumericControlValue('target-vertical-oscillation-speed', SETTINGS.targetVerticalOscillationSpeed);
+  setNumericControlValue('target-strafe-amount', SETTINGS.targetStrafeAmount);
+  setNumericControlValue('target-strafe-oscillation-speed', SETTINGS.targetStrafeOscillationSpeed);
   setNumericControlValue('recoil-y-strength', SETTINGS.recoilYStrength);
   setNumericControlValue('recoil-variance', SETTINGS.recoilVariance);
   setNumericControlValue('recoil-horizontal-oscillation', SETTINGS.recoilHorizontalOscillationStrength);
