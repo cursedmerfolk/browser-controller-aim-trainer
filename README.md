@@ -38,7 +38,7 @@ The proof of concept is ready when the browser shows:
 - a rifle-like held weapon in first person
 - a dynamic tick-mark crosshair that tightens when aiming down sights
 - score, hits, shots, accuracy, and raw stick values in the HUD
-- a controller settings panel for sensitivity, deadzone, FOV, projectile rate, sphere speed, recoil Y strength, recoil variance, recoil horizontal oscillation, recoil intensity oscillator, invert-Y, and response curves
+- a controller settings panel for sensitivity, deadzone, FOV, projectile rate, sphere speed, recoil Y strength, recoil variance, recoil horizontal oscillation, recoil horizontal oscillation speed, recoil intensity oscillator, recoil intensity oscillator speed, invert-Y, and response curves
 - keyboard fallback aiming and shooting if no controller is connected
 
 ## Local scripts

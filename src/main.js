@@ -28,7 +28,9 @@ const DEFAULT_SETTINGS = {
   recoilYStrength: 0.6,
   recoilVariance: 0.18,
   recoilHorizontalOscillationStrength: 0.3,
+  recoilHorizontalOscillationSpeed: 0.82,
   recoilIntensityOscillator: 0.35,
+  recoilIntensityOscillationSpeed: 0.37,
   sphereSpeed: 1.35,
   targetCount: 8,
   targetRadius: 0.45,
@@ -79,17 +81,17 @@ const state = {
 const app = document.querySelector('#app');
 app.innerHTML = `
   <div class="hud-panel hud edge-panel is-collapsed" id="hud-panel" data-side="left">
-    <button
-      class="panel-toggle"
-      id="hud-panel-toggle"
-      type="button"
-      aria-expanded="false"
-      aria-label="Collapse Controller Aim Trainer panel"
-    >
-      <span aria-hidden="true">˄</span>
-    </button>
     <div class="panel-header">
       <strong>Controller Aim Trainer</strong>
+      <button
+        class="panel-toggle"
+        id="hud-panel-toggle"
+        type="button"
+        aria-expanded="false"
+        aria-label="Collapse Controller Aim Trainer panel"
+      >
+        <span aria-hidden="true">˄</span>
+      </button>
     </div>
     <div class="panel-content">
       <div id="gamepad-status">Controller: ${state.gamepadName}</div>
@@ -110,17 +112,17 @@ app.innerHTML = `
     <span class="crosshair-tick crosshair-tick-left"></span>
   </div>
   <div class="hud-panel settings-panel edge-panel is-collapsed" id="settings-panel" data-side="right">
-    <button
-      class="panel-toggle"
-      id="settings-panel-toggle"
-      type="button"
-      aria-expanded="false"
-      aria-label="Collapse Controller settings panel"
-    >
-      <span aria-hidden="true">˄</span>
-    </button>
     <div class="panel-header">
       <strong>Controller settings</strong>
+      <button
+        class="panel-toggle"
+        id="settings-panel-toggle"
+        type="button"
+        aria-expanded="false"
+        aria-label="Collapse Controller settings panel"
+      >
+        <span aria-hidden="true">˄</span>
+      </button>
     </div>
     <div class="panel-content">
     ${renderNumericControl({
@@ -188,12 +190,28 @@ app.innerHTML = `
       value: SETTINGS.recoilHorizontalOscillationStrength
     })}
     ${renderNumericControl({
+      id: 'recoil-horizontal-oscillation-speed',
+      label: 'Recoil horiz. osc. speed',
+      min: 0.1,
+      max: 3,
+      step: 0.05,
+      value: SETTINGS.recoilHorizontalOscillationSpeed
+    })}
+    ${renderNumericControl({
       id: 'recoil-intensity-oscillator',
       label: 'Recoil intensity oscillator',
       min: 0,
       max: 1.5,
       step: 0.05,
       value: SETTINGS.recoilIntensityOscillator
+    })}
+    ${renderNumericControl({
+      id: 'recoil-intensity-oscillation-speed',
+      label: 'Recoil intensity osc. speed',
+      min: 0.1,
+      max: 2,
+      step: 0.05,
+      value: SETTINGS.recoilIntensityOscillationSpeed
     })}
     <label class="control-group" for="response-curve-input">
       <span>Response curve</span>
@@ -208,17 +226,17 @@ app.innerHTML = `
     </div>
   </div>
   <div class="hud-panel instructions edge-panel is-collapsed" id="controls-panel" data-side="left">
-    <button
-      class="panel-toggle"
-      id="controls-panel-toggle"
-      type="button"
-      aria-expanded="false"
-      aria-label="Collapse Controls panel"
-    >
-      <span aria-hidden="true">˄</span>
-    </button>
     <div class="panel-header">
       <strong>Controls</strong>
+      <button
+        class="panel-toggle"
+        id="controls-panel-toggle"
+        type="button"
+        aria-expanded="false"
+        aria-label="Collapse Controls panel"
+      >
+        <span aria-hidden="true">˄</span>
+      </button>
     </div>
     <div class="panel-content">
       <div>Right stick: aim</div>
@@ -447,12 +465,32 @@ bindNumericSetting({
 });
 
 bindNumericSetting({
+  id: 'recoil-horizontal-oscillation-speed',
+  min: 0.1,
+  max: 3,
+  fallback: DEFAULT_SETTINGS.recoilHorizontalOscillationSpeed,
+  onChange: (value) => {
+    SETTINGS.recoilHorizontalOscillationSpeed = value;
+  }
+});
+
+bindNumericSetting({
   id: 'recoil-intensity-oscillator',
   min: 0,
   max: 1.5,
   fallback: DEFAULT_SETTINGS.recoilIntensityOscillator,
   onChange: (value) => {
     SETTINGS.recoilIntensityOscillator = value;
+  }
+});
+
+bindNumericSetting({
+  id: 'recoil-intensity-oscillation-speed',
+  min: 0.1,
+  max: 2,
+  fallback: DEFAULT_SETTINGS.recoilIntensityOscillationSpeed,
+  onChange: (value) => {
+    SETTINGS.recoilIntensityOscillationSpeed = value;
   }
 });
 
@@ -706,8 +744,9 @@ function getCurrentSpreadPx() {
 
 function getRecoilPoint(shotIndex) {
   const step = shotIndex + 1;
-  const intensityOscillation = Math.sin(step * 0.37) * SETTINGS.recoilIntensityOscillator;
-  const oscillationRate = 0.82 + intensityOscillation * 0.55;
+  const intensityOscillation =
+    Math.sin(step * SETTINGS.recoilIntensityOscillationSpeed) * SETTINGS.recoilIntensityOscillator;
+  const oscillationRate = SETTINGS.recoilHorizontalOscillationSpeed + intensityOscillation * 0.55;
   const intensityScale = Math.max(0.15, 1 + intensityOscillation * 0.7);
   const expectedX = Math.sin(step * oscillationRate) * SETTINGS.recoilHorizontalOscillationStrength * intensityScale;
   const varianceX = randomRange(-SETTINGS.recoilVariance, SETTINGS.recoilVariance);
@@ -972,7 +1011,7 @@ function updateHud() {
   hudElements.gamepadStatus.textContent = `Controller: ${state.gamepadName}`;
   hudElements.modeStatus.textContent = `Aim mode: ${state.isAimingDownSights ? 'ADS' : 'HIP FIRE'}`;
   hudElements.curveStatus.textContent = `Curve: ${getResponseCurveLabel(SETTINGS.responseCurve)}`;
-  hudElements.recoilStatus.textContent = `Recoil: Y ${SETTINGS.recoilYStrength.toFixed(2)} | Var ${SETTINGS.recoilVariance.toFixed(2)} | Osc ${SETTINGS.recoilHorizontalOscillationStrength.toFixed(2)} | Int ${SETTINGS.recoilIntensityOscillator.toFixed(2)}`;
+  hudElements.recoilStatus.textContent = `Recoil: Y ${SETTINGS.recoilYStrength.toFixed(2)} | Var ${SETTINGS.recoilVariance.toFixed(2)} | Osc ${SETTINGS.recoilHorizontalOscillationStrength.toFixed(2)} @ ${SETTINGS.recoilHorizontalOscillationSpeed.toFixed(2)} | Int ${SETTINGS.recoilIntensityOscillator.toFixed(2)} @ ${SETTINGS.recoilIntensityOscillationSpeed.toFixed(2)}`;
   hudElements.score.textContent = `Score: ${state.score}`;
   hudElements.accuracy.textContent = `Accuracy: ${accuracy}%`;
   hudElements.shots.textContent = `Shots: ${state.shots} | Hits: ${state.hits}`;
@@ -1105,11 +1144,23 @@ function loadStoredSettings() {
         5,
         DEFAULT_SETTINGS.recoilHorizontalOscillationStrength
       ),
+      recoilHorizontalOscillationSpeed: clampSetting(
+        parsed.recoilHorizontalOscillationSpeed,
+        0.1,
+        3,
+        DEFAULT_SETTINGS.recoilHorizontalOscillationSpeed
+      ),
       recoilIntensityOscillator: clampSetting(
         parsed.recoilIntensityOscillator,
         0,
         1.5,
         DEFAULT_SETTINGS.recoilIntensityOscillator
+      ),
+      recoilIntensityOscillationSpeed: clampSetting(
+        parsed.recoilIntensityOscillationSpeed,
+        0.1,
+        2,
+        DEFAULT_SETTINGS.recoilIntensityOscillationSpeed
       ),
       sphereSpeed: clampSetting(parsed.sphereSpeed, 0.4, 2.5, DEFAULT_SETTINGS.sphereSpeed),
       responseCurve: sanitizeResponseCurve(parsed.responseCurve),
@@ -1132,7 +1183,9 @@ function storeSettings() {
       recoilYStrength: SETTINGS.recoilYStrength,
       recoilVariance: SETTINGS.recoilVariance,
       recoilHorizontalOscillationStrength: SETTINGS.recoilHorizontalOscillationStrength,
+      recoilHorizontalOscillationSpeed: SETTINGS.recoilHorizontalOscillationSpeed,
       recoilIntensityOscillator: SETTINGS.recoilIntensityOscillator,
+      recoilIntensityOscillationSpeed: SETTINGS.recoilIntensityOscillationSpeed,
       sphereSpeed: SETTINGS.sphereSpeed,
       responseCurve: SETTINGS.responseCurve,
       invertY: SETTINGS.invertY
