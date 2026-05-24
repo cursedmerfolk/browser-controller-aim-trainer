@@ -501,9 +501,11 @@ directionalLight.position.set(3, 8, 4);
 directionalLight.castShadow = true;
 scene.add(directionalLight);
 
+const floorTexture = createCheckerboardTexture();
+floorTexture.anisotropy = renderer.capabilities.getMaxAnisotropy();
 const floor = new THREE.Mesh(
   new THREE.PlaneGeometry(64, 180),
-  new THREE.MeshStandardMaterial({ color: 0x1c2438, roughness: 0.75 })
+  new THREE.MeshStandardMaterial({ map: floorTexture, roughness: 0.82 })
 );
 floor.rotation.x = -Math.PI / 2;
 floor.position.y = -0.12;
@@ -1161,8 +1163,7 @@ function applyPlayerMovement(moveX, delta) {
     return;
   }
 
-  const strafeDirection = new THREE.Vector3(1, 0, 0).applyAxisAngle(PROJECTILE_UP_AXIS, state.yaw).normalize();
-  camera.position.addScaledVector(strafeDirection, moveX * PLAYER_STRAFE_SPEED * delta);
+  camera.position.x += moveX * PLAYER_STRAFE_SPEED * delta;
   camera.position.y = PLAYER_EYE_HEIGHT;
 }
 
@@ -1974,6 +1975,29 @@ function renderOptions(options, selectedValue) {
 
 function renderProfileOptions(options, selectedValue, createLabel) {
   return `${renderOptions(options, selectedValue)}<option value="${CREATE_NEW_PROFILE_VALUE}">${createLabel}</option>`;
+}
+
+function createCheckerboardTexture() {
+  const canvas = document.createElement('canvas');
+  const tileCount = 8;
+  const tileSize = 32;
+  canvas.width = tileCount * tileSize;
+  canvas.height = tileCount * tileSize;
+
+  const context = canvas.getContext('2d');
+  for (let y = 0; y < tileCount; y += 1) {
+    for (let x = 0; x < tileCount; x += 1) {
+      context.fillStyle = (x + y) % 2 === 0 ? '#24304a' : '#121a2b';
+      context.fillRect(x * tileSize, y * tileSize, tileSize, tileSize);
+    }
+  }
+
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.colorSpace = THREE.SRGBColorSpace;
+  texture.wrapS = THREE.RepeatWrapping;
+  texture.wrapT = THREE.RepeatWrapping;
+  texture.repeat.set(12, 30);
+  return texture;
 }
 
 function getButtonValue(button) {
