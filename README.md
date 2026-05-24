@@ -9,7 +9,7 @@ The app uses:
 - Browser Gamepad API for controller input
 - Keyboard fallback controls for testing without a controller
 - Live controller tuning controls for sensitivity, deadzone, FOV, invert-Y, and response curves
-- Live projectile-rate and spray-pattern tuning controls with keyboard-editable numeric inputs
+- Live projectile-rate, sphere-speed, and spray-pattern tuning controls with keyboard-editable numeric inputs
 - ADS with a simple rifle viewmodel, tighter aim handling, and automatic fire
 - Moving multi-hit targets that shift from green to red as they take damage
 - VS Code Dev Containers for a reproducible development environment
@@ -38,7 +38,7 @@ The proof of concept is ready when the browser shows:
 - a rifle-like held weapon in first person
 - a dynamic tick-mark crosshair that tightens when aiming down sights
 - score, hits, shots, accuracy, and raw stick values in the HUD
-- a controller settings panel for sensitivity, deadzone, FOV, projectile rate, spray pattern, invert-Y, and response curves
+- a controller settings panel for sensitivity, deadzone, FOV, projectile rate, sphere speed, spray pattern, invert-Y, and response curves
 - keyboard fallback aiming and shooting if no controller is connected
 
 ## Local scripts

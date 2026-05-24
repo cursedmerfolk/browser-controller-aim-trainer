@@ -19,6 +19,7 @@ const FULL_HEALTH_COLOR = new THREE.Color(0x2fd66b);
 const LOW_HEALTH_COLOR = new THREE.Color(0xff4d6d);
 const FULL_HEALTH_EMISSIVE = new THREE.Color(0x07150d);
 const LOW_HEALTH_EMISSIVE = new THREE.Color(0x2a050a);
+const PROJECTILE_UP_AXIS = new THREE.Vector3(0, 1, 0);
 
 const DEFAULT_SETTINGS = {
   lookSensitivity: 2.8,
@@ -26,9 +27,10 @@ const DEFAULT_SETTINGS = {
   invertY: false,
   fov: 75,
   responseCurve: 'linear',
-  projectileRate: 5.5,
+  projectileRate: 14,
   sprayPatternShape: 'vertical',
   sprayPatternStrength: 0.45,
+  sphereSpeed: 1.35,
   targetCount: 8,
   targetRadius: 0.45,
   targetMaxHealth: 4,
@@ -36,8 +38,8 @@ const DEFAULT_SETTINGS = {
   spawnDistanceMax: 16,
   targetLifetimeMin: 6,
   targetLifetimeMax: 9,
-  targetHorizontalSpeedMin: 0.35,
-  targetHorizontalSpeedMax: 0.85,
+  targetHorizontalSpeedMin: 0.6,
+  targetHorizontalSpeedMax: 1.2,
   adsFovMultiplier: 0.72,
   adsSensitivityMultiplier: 0.58,
   hipFireSpreadPx: 18,
@@ -46,7 +48,7 @@ const DEFAULT_SETTINGS = {
   adsSpreadNdc: 0.0035,
   shotSpreadKickPx: 4.5,
   shotSpreadKickNdc: 0.0055,
-  projectileSpeed: 34,
+  projectileSpeed: 260,
   projectileMaxDistance: 40
 };
 
@@ -128,6 +130,14 @@ app.innerHTML = `
       max: 15,
       step: 0.5,
       value: SETTINGS.projectileRate
+    })}
+    ${renderNumericControl({
+      id: 'sphere-speed',
+      label: 'Sphere speed',
+      min: 0.4,
+      max: 2.5,
+      step: 0.05,
+      value: SETTINGS.sphereSpeed
     })}
     ${renderNumericControl({
       id: 'spray-strength',
@@ -213,7 +223,7 @@ camera.add(weapon);
 const targets = [];
 const projectiles = [];
 const targetGeometry = new THREE.SphereGeometry(SETTINGS.targetRadius, 32, 32);
-const projectileGeometry = new THREE.SphereGeometry(0.05, 10, 10);
+const projectileGeometry = new THREE.CylinderGeometry(0.025, 0.025, 1, 10);
 const projectileMaterial = new THREE.MeshStandardMaterial({
   color: 0xfff2b6,
   emissive: 0xffb347,
@@ -338,6 +348,16 @@ bindNumericSetting({
 });
 
 bindNumericSetting({
+  id: 'sphere-speed',
+  min: 0.4,
+  max: 2.5,
+  fallback: DEFAULT_SETTINGS.sphereSpeed,
+  onChange: (value) => {
+    SETTINGS.sphereSpeed = value;
+  }
+});
+
+bindNumericSetting({
   id: 'spray-strength',
   min: 0.05,
   max: 1.2,
@@ -364,7 +384,6 @@ hudElements.invertYInput.addEventListener('change', (event) => {
 
 function loop() {
   const delta = clock.getDelta();
-  const elapsed = clock.elapsedTime;
   const input = getInputState();
 
   updateAimState(delta, input.adsPressed, input.shootPressed);
@@ -372,7 +391,7 @@ function loop() {
   updateCamera();
   updateFiring(delta, input.shootPressed);
   updateWeaponTransform();
-  updateTargets(delta, elapsed);
+  updateTargets(delta);
   updateProjectiles(delta);
   updateCrosshair();
   updateHud();
@@ -605,15 +624,20 @@ function getSprayPatternPoint(shotIndex) {
 function createProjectileVisual(start, end) {
   const mesh = new THREE.Mesh(projectileGeometry, projectileMaterial);
   const distance = start.distanceTo(end);
+  const direction = end.clone().sub(start).normalize();
 
   mesh.position.copy(start);
+  mesh.quaternion.setFromUnitVectors(PROJECTILE_UP_AXIS, direction);
   scene.add(mesh);
   projectiles.push({
     mesh,
     start,
     end,
+    direction,
+    distance,
+    trailLength: Math.min(Math.max(distance * 0.4, 3.5), 8),
     progress: 0,
-    duration: Math.max(distance / SETTINGS.projectileSpeed, 0.08)
+    duration: Math.max(distance / SETTINGS.projectileSpeed, 0.02)
   });
 }
 
@@ -628,8 +652,17 @@ function updateProjectiles(delta) {
       continue;
     }
 
-    projectile.mesh.position.lerpVectors(projectile.start, projectile.end, projectile.progress);
-    projectile.mesh.scale.setScalar(1 - projectile.progress * 0.2);
+    const headDistance = projectile.distance * projectile.progress;
+    const tailDistance = Math.max(0, headDistance - projectile.trailLength);
+    const head = projectile.start.clone().addScaledVector(projectile.direction, headDistance);
+    const tail = projectile.start.clone().addScaledVector(projectile.direction, tailDistance);
+    const segment = head.clone().sub(tail);
+    const segmentLength = Math.max(segment.length(), 0.001);
+    const midpoint = tail.clone().addScaledVector(segment, 0.5);
+
+    projectile.mesh.position.copy(midpoint);
+    projectile.mesh.quaternion.setFromUnitVectors(PROJECTILE_UP_AXIS, projectile.direction);
+    projectile.mesh.scale.set(1, segmentLength, 1);
   }
 }
 
@@ -690,9 +723,6 @@ function respawnTarget(target) {
   target.userData.age = 0;
   target.userData.lifetime = randomRange(SETTINGS.targetLifetimeMin, SETTINGS.targetLifetimeMax);
   target.userData.health = target.userData.maxHealth;
-  target.userData.bobAmplitude = randomRange(0.12, 0.35);
-  target.userData.bobPhase = randomRange(0, Math.PI * 2);
-  target.userData.bobSpeed = randomRange(1.2, 2.2);
   target.userData.rotationSpeed = randomRange(0.8, 1.6);
 
   target.position.copy(worldPosition);
@@ -712,7 +742,9 @@ function getHorizontalVelocity() {
   }
 
   return direction.multiplyScalar(
-    randomRange(SETTINGS.targetHorizontalSpeedMin, SETTINGS.targetHorizontalSpeedMax) * (Math.random() < 0.5 ? -1 : 1)
+    randomRange(SETTINGS.targetHorizontalSpeedMin, SETTINGS.targetHorizontalSpeedMax) *
+      SETTINGS.sphereSpeed *
+      (Math.random() < 0.5 ? -1 : 1)
   );
 }
 
@@ -729,12 +761,11 @@ function applyTargetHealthVisuals(target) {
   target.material.emissive.lerpColors(LOW_HEALTH_EMISSIVE, FULL_HEALTH_EMISSIVE, healthRatio);
 }
 
-function updateTargets(delta, elapsed) {
+function updateTargets(delta) {
   for (const target of targets) {
     target.userData.age += delta;
     target.userData.basePosition.addScaledVector(target.userData.horizontalVelocity, delta);
     target.position.copy(target.userData.basePosition);
-    target.position.y += Math.sin(elapsed * target.userData.bobSpeed + target.userData.bobPhase) * target.userData.bobAmplitude;
     target.rotation.y += delta * target.userData.rotationSpeed;
 
     if (target.userData.age >= target.userData.lifetime) {
@@ -915,6 +946,7 @@ function loadStoredSettings() {
       fov: clampSetting(parsed.fov, 50, 110, DEFAULT_SETTINGS.fov),
       projectileRate: clampSetting(parsed.projectileRate, 1, 15, DEFAULT_SETTINGS.projectileRate),
       sprayPatternStrength: clampSetting(parsed.sprayPatternStrength, 0.05, 1.2, DEFAULT_SETTINGS.sprayPatternStrength),
+      sphereSpeed: clampSetting(parsed.sphereSpeed, 0.4, 2.5, DEFAULT_SETTINGS.sphereSpeed),
       responseCurve: sanitizeResponseCurve(parsed.responseCurve),
       sprayPatternShape: sanitizeSprayPattern(parsed.sprayPatternShape),
       invertY: typeof parsed.invertY === 'boolean' ? parsed.invertY : DEFAULT_SETTINGS.invertY
@@ -934,6 +966,7 @@ function storeSettings() {
       fov: SETTINGS.fov,
       projectileRate: SETTINGS.projectileRate,
       sprayPatternStrength: SETTINGS.sprayPatternStrength,
+      sphereSpeed: SETTINGS.sphereSpeed,
       responseCurve: SETTINGS.responseCurve,
       sprayPatternShape: SETTINGS.sprayPatternShape,
       invertY: SETTINGS.invertY
