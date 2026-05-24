@@ -946,7 +946,7 @@ function getCurrentSpreadPx() {
 function getRecoilPoint(shotIndex) {
   const step = shotIndex;
   const intensityOscillation =
-    Math.sin(step * SETTINGS.recoilIntensityOscillationSpeed) * SETTINGS.recoilIntensityOscillator;
+    getTriangleWave(step * SETTINGS.recoilIntensityOscillationSpeed) * SETTINGS.recoilIntensityOscillator;
   const intensityScale = Math.max(0, 1 + intensityOscillation);
   const expectedX =
     Math.sin(step * SETTINGS.recoilHorizontalOscillationSpeed) *
@@ -957,7 +957,7 @@ function getRecoilPoint(shotIndex) {
 
   return new THREE.Vector2(
     expectedX + varianceX,
-    Math.max(0, SETTINGS.recoilYStrength * intensityScale + varianceY)
+    Math.max(0, SETTINGS.recoilYStrength + varianceY)
   );
 }
 
@@ -1770,6 +1770,11 @@ function getYawToPoint(origin, point) {
 
 function getShortestAngleDelta(fromAngle, toAngle) {
   return Math.atan2(Math.sin(toAngle - fromAngle), Math.cos(toAngle - fromAngle));
+}
+
+function getTriangleWave(value) {
+  const normalizedCycle = ((value / (Math.PI * 2)) + 0.25) % 1;
+  return 1 - 4 * Math.abs(normalizedCycle - 0.5);
 }
 
 function clampSetting(value, min, max, fallback) {
