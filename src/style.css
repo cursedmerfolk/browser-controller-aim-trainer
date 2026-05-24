@@ -39,17 +39,15 @@ canvas {
   font-size: 16px;
 }
 
-.edge-panel[data-side='left'] {
-  padding-right: 46px;
-}
-
-.edge-panel[data-side='right'] {
-  padding-left: 46px;
+.edge-panel {
+  padding-bottom: 46px;
 }
 
 .panel-toggle {
   position: absolute;
-  top: 10px;
+  bottom: 10px;
+  left: 50%;
+  transform: translateX(-50%);
   z-index: 1;
   width: 28px;
   height: 28px;
@@ -62,20 +60,8 @@ canvas {
   background: rgba(255, 255, 255, 0.14);
 }
 
-.edge-panel[data-side='left'] .panel-toggle {
-  right: 10px;
-}
-
-.edge-panel[data-side='right'] .panel-toggle {
-  left: 10px;
-}
-
-.edge-panel.is-collapsed[data-side='left'] {
-  transform: translateX(calc(-100% + 46px));
-}
-
-.edge-panel.is-collapsed[data-side='right'] {
-  transform: translateX(calc(100% - 46px));
+.edge-panel.is-collapsed {
+  transform: translateY(var(--collapse-distance, 0px));
 }
 
 .crosshair {
