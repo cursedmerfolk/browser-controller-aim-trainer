@@ -22,6 +22,7 @@ const TARGET_HEAD_RADIUS = 0.18;
 const CENTER_SCREEN = new THREE.Vector2(0, 0);
 const BULLET_MAGNETISM_CONE_ANGLE = THREE.MathUtils.degToRad(8);
 const ADS_SNAP_CONE_ANGLE = THREE.MathUtils.degToRad(10);
+const DEBUG_VISUAL_OFFSET = 0.2;
 const LEGACY_TARGET_SPEED_MIN = 0.45;
 const LEGACY_TARGET_SPEED_MAX = 1.8;
 const LEGACY_SETTINGS_ORDER = [
@@ -93,6 +94,7 @@ const state = {
   pitch: 0,
   rawStickX: 0,
   rawStickY: 0,
+  playerVelocity: new THREE.Vector3(),
   isAimingDownSights: false,
   aimBlend: 0,
   spreadKick: 0,
@@ -336,6 +338,7 @@ scene.fog = new THREE.Fog(0x0b1020, 36, 110);
 const camera = new THREE.PerspectiveCamera(SETTINGS.fov, window.innerWidth / window.innerHeight, 0.1, 100);
 camera.position.set(0, 2.2, 0);
 scene.add(camera);
+const previousCameraOrigin = camera.position.clone();
 
 const ambientLight = new THREE.HemisphereLight(0xffffff, 0x223355, 1.5);
 scene.add(ambientLight);
@@ -365,7 +368,7 @@ scene.add(backWall);
 const weapon = createWeaponModel();
 camera.add(weapon);
 const aimAssistDebugVisuals = createAimAssistDebugVisuals();
-camera.add(aimAssistDebugVisuals.group);
+scene.add(aimAssistDebugVisuals.group);
 
 const targets = [];
 const projectiles = [];
@@ -645,6 +648,7 @@ function loop() {
   updateAimState(delta, input.adsPressed, input.shootPressed);
   applyLookInput(input.lookX, input.lookY, delta, directAimTarget, input.usingGamepad);
   updateCamera();
+  updatePlayerVelocity(delta);
   applyAimAssist(delta);
   updateCamera();
   updateAimAssistDebugVisuals();
@@ -775,7 +779,7 @@ function updateAimState(delta, adsPressed, shootPressed) {
 function applyAimAssist(delta) {
   const directAimTarget = getDirectAimTarget();
   if (directAimTarget && SETTINGS.aimStickiness > 0) {
-    nudgeAimTowardTarget(directAimTarget, 1 - Math.exp(-delta * 10 * SETTINGS.aimStickiness));
+    state.yaw += getStickinessYawNudge(directAimTarget, delta) * SETTINGS.aimStickiness;
   }
 
   if (state.isAimingDownSights && SETTINGS.adsSnap > 0) {
@@ -1171,51 +1175,86 @@ function createWeaponModel() {
 function createAimAssistDebugVisuals() {
   const group = new THREE.Group();
   const lineLength = SETTINGS.projectileMaxDistance;
-  const rayMaterial = new THREE.MeshBasicMaterial({
-    color: 0x48c7ff,
+  const magnetismCone = createDebugCone(BULLET_MAGNETISM_CONE_ANGLE, lineLength, 0xffb347);
+  group.add(magnetismCone);
+
+  const adsSnapCone = createDebugCone(ADS_SNAP_CONE_ANGLE, lineLength, 0xff4d6d);
+  group.add(adsSnapCone);
+
+  return { group, magnetismCone, adsSnapCone };
+}
+
+function createDebugLine(color, length) {
+  const geometry = new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(0, 0, 0), new THREE.Vector3(0, 0, -length)]);
+  const material = new THREE.LineBasicMaterial({
+    color,
     transparent: true,
-    opacity: 0.18,
-    depthWrite: false
+    opacity: 0.95,
+    depthTest: false
   });
-  const magnetismMaterial = new THREE.MeshBasicMaterial({
-    color: 0xffb347,
+  const line = new THREE.Line(geometry, material);
+  line.renderOrder = 12;
+  return line;
+}
+
+function createDebugCone(angle, length, color) {
+  const radius = Math.tan(angle) * length;
+  const coneGroup = new THREE.Group();
+  const surfaceMaterial = new THREE.MeshBasicMaterial({
+    color,
     transparent: true,
     opacity: 0.12,
     side: THREE.DoubleSide,
-    depthWrite: false
+    depthWrite: false,
+    depthTest: false
   });
-  const adsSnapMaterial = new THREE.MeshBasicMaterial({
-    color: 0xff4d6d,
-    transparent: true,
-    opacity: 0.1,
-    side: THREE.DoubleSide,
-    depthWrite: false
-  });
-
-  const directRay = new THREE.Mesh(new THREE.CylinderGeometry(0.018, 0.018, lineLength, 10), rayMaterial);
-  directRay.rotation.x = Math.PI / 2;
-  directRay.position.z = -lineLength / 2;
-  group.add(directRay);
-
-  const magnetismCone = createDebugCone(BULLET_MAGNETISM_CONE_ANGLE, lineLength, magnetismMaterial);
-  group.add(magnetismCone);
-
-  const adsSnapCone = createDebugCone(ADS_SNAP_CONE_ANGLE, lineLength, adsSnapMaterial);
-  group.add(adsSnapCone);
-
-  return { group, directRay, magnetismCone, adsSnapCone };
-}
-
-function createDebugCone(angle, length, material) {
-  const radius = Math.tan(angle) * length;
-  const cone = new THREE.Mesh(new THREE.ConeGeometry(radius, length, 24, 1, true), material);
+  const cone = new THREE.Mesh(new THREE.ConeGeometry(radius, length, 24, 1, true), surfaceMaterial);
   cone.rotation.x = Math.PI / 2;
   cone.position.z = -length / 2;
-  return cone;
+  cone.renderOrder = 10;
+  coneGroup.add(cone);
+
+  const wireframe = new THREE.LineSegments(
+    new THREE.EdgesGeometry(new THREE.ConeGeometry(radius, length, 24, 1, true)),
+    new THREE.LineBasicMaterial({
+      color,
+      transparent: true,
+      opacity: 0.95,
+      depthTest: false
+    })
+  );
+  wireframe.rotation.x = Math.PI / 2;
+  wireframe.position.z = -length / 2;
+  wireframe.renderOrder = 12;
+  coneGroup.add(wireframe);
+
+  const baseRing = new THREE.LineLoop(
+    new THREE.BufferGeometry().setFromPoints(
+      Array.from({ length: 32 }, (_, index) => {
+        const theta = (index / 32) * Math.PI * 2;
+        return new THREE.Vector3(Math.cos(theta) * radius, Math.sin(theta) * radius, -length);
+      })
+    ),
+    new THREE.LineBasicMaterial({
+      color,
+      transparent: true,
+      opacity: 0.95,
+      depthTest: false
+    })
+  );
+  baseRing.renderOrder = 12;
+  coneGroup.add(baseRing);
+
+  const centerLine = createDebugLine(color, length);
+  coneGroup.add(centerLine);
+
+  return coneGroup;
 }
 
 function updateAimAssistDebugVisuals() {
-  aimAssistDebugVisuals.directRay.visible = true;
+  const debugOrigin = getCameraOrigin().addScaledVector(getCameraForward(), DEBUG_VISUAL_OFFSET);
+  aimAssistDebugVisuals.group.position.copy(debugOrigin);
+  aimAssistDebugVisuals.group.quaternion.copy(camera.getWorldQuaternion(new THREE.Quaternion()));
   aimAssistDebugVisuals.magnetismCone.visible = SETTINGS.bulletMagnetism > 0;
   aimAssistDebugVisuals.adsSnapCone.visible = SETTINGS.adsSnap > 0 && state.isAimingDownSights;
 }
@@ -1513,6 +1552,17 @@ function getCameraForward() {
   return camera.getWorldDirection(new THREE.Vector3()).normalize();
 }
 
+function updatePlayerVelocity(delta) {
+  if (delta <= 0) {
+    state.playerVelocity.set(0, 0, 0);
+    return;
+  }
+
+  const currentCameraOrigin = getCameraOrigin();
+  state.playerVelocity.copy(currentCameraOrigin).sub(previousCameraOrigin).divideScalar(delta);
+  previousCameraOrigin.copy(currentCameraOrigin);
+}
+
 function getDirectAimTarget() {
   raycaster.setFromCamera(CENTER_SCREEN, camera);
   const intersections = raycaster.intersectObjects(targets, true);
@@ -1551,13 +1601,37 @@ function getNearestTargetInCone(origin, direction, maxAngle) {
   return nearestTarget;
 }
 
-function nudgeAimTowardTarget(target, amount) {
+function nudgeAimTowardTarget(target, amount, adjustPitch = true) {
   const targetDirection = getTargetAimPoint(target).sub(getCameraOrigin()).normalize();
   const desiredYaw = Math.atan2(-targetDirection.x, -targetDirection.z);
-  const desiredPitch = Math.asin(THREE.MathUtils.clamp(targetDirection.y, -1, 1));
 
   state.yaw += getShortestAngleDelta(state.yaw, desiredYaw) * amount;
-  state.pitch = THREE.MathUtils.clamp(state.pitch + (desiredPitch - state.pitch) * amount, -0.85, 0.85);
+
+  if (adjustPitch) {
+    const desiredPitch = Math.asin(THREE.MathUtils.clamp(targetDirection.y, -1, 1));
+    state.pitch = THREE.MathUtils.clamp(state.pitch + (desiredPitch - state.pitch) * amount, -0.85, 0.85);
+  }
+}
+
+function getStickinessYawNudge(target, delta) {
+  const origin = getCameraOrigin();
+  const currentTargetPoint = getHorizontalStickinessPoint(target, origin.y);
+  const predictedTargetPoint = currentTargetPoint.clone().addScaledVector(getRelativeTargetVelocity(target), delta);
+  const currentYaw = getYawToPoint(origin, currentTargetPoint);
+  const predictedYaw = getYawToPoint(origin, predictedTargetPoint);
+  return getShortestAngleDelta(currentYaw, predictedYaw);
+}
+
+function getRelativeTargetVelocity(target) {
+  return target.userData.horizontalVelocity.clone().sub(state.playerVelocity.clone().setY(0)).setY(0);
+}
+
+function getHorizontalStickinessPoint(target, originY) {
+  return new THREE.Vector3(target.position.x, originY, target.position.z);
+}
+
+function getYawToPoint(origin, point) {
+  return Math.atan2(-(point.x - origin.x), -(point.z - origin.z));
 }
 
 function getShortestAngleDelta(fromAngle, toAngle) {
