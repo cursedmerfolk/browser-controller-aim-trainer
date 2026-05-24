@@ -2,7 +2,7 @@ import './style.css';
 import * as THREE from 'three';
 
 const SETTINGS_STORAGE_KEY = 'browser-controller-aim-trainer.settings';
-const SETTINGS_STORAGE_VERSION = 2;
+const SETTINGS_STORAGE_VERSION = 3;
 
 const RESPONSE_CURVE_OPTIONS = [
   { value: 'linear', label: 'Linear' },
@@ -24,6 +24,9 @@ const ADS_SNAP_CYLINDER_RADIUS = 1;
 const DEBUG_VISUAL_OFFSET = 0.2;
 const LEGACY_TARGET_SPEED_MIN = 0.45;
 const LEGACY_TARGET_SPEED_MAX = 1.8;
+const DEFAULT_GAME_PROFILE_NAME = 'Marathon';
+const DEFAULT_GUN_PROFILE_NAME = 'Overrun AR';
+const CREATE_NEW_PROFILE_VALUE = '__create_new_profile__';
 const LEGACY_SETTINGS_ORDER = [
   'lookSensitivity',
   'deadzone',
@@ -38,6 +41,46 @@ const LEGACY_SETTINGS_ORDER = [
   'recoilIntensityOscillationSpeed',
   'responseCurve',
   'invertY'
+];
+const GAME_SETTING_KEYS = [
+  'lookSensitivity',
+  'deadzone',
+  'invertY',
+  'fov',
+  'responseCurve',
+  'aimSlow',
+  'aimStickiness',
+  'adsSnap',
+  'showDebugShapes',
+  'targetHorizontalSpeedMin',
+  'targetHorizontalSpeedMax',
+  'targetCount',
+  'targetRadius',
+  'targetMaxHealth',
+  'spawnDistanceMin',
+  'spawnDistanceMax',
+  'targetLifetimeMin',
+  'targetLifetimeMax',
+  'adsFovMultiplier',
+  'adsSensitivityMultiplier',
+  'hipFireSpreadPx',
+  'adsSpreadPx',
+  'hipFireSpreadNdc',
+  'adsSpreadNdc',
+  'shotSpreadKickPx',
+  'shotSpreadKickNdc',
+  'projectileSpeed',
+  'projectileMaxDistance'
+];
+const GUN_SETTING_KEYS = [
+  'projectileRate',
+  'bulletMagnetism',
+  'recoilYStrength',
+  'recoilVariance',
+  'recoilHorizontalOscillationStrength',
+  'recoilHorizontalOscillationSpeed',
+  'recoilIntensityOscillator',
+  'recoilIntensityOscillationSpeed'
 ];
 
 const DEFAULT_SETTINGS = {
@@ -79,10 +122,8 @@ const DEFAULT_SETTINGS = {
   projectileMaxDistance: 40
 };
 
-const SETTINGS = {
-  ...DEFAULT_SETTINGS,
-  ...loadStoredSettings()
-};
+const profileState = loadProfileState();
+const SETTINGS = createSettingsProxy(profileState);
 
 const state = {
   score: 0,
@@ -158,6 +199,20 @@ app.innerHTML = `
       </button>
     </div>
     <div class="panel-content">
+    ${renderProfileSelect({
+      id: 'game-profile-select',
+      label: 'Game profile',
+      options: getProfileOptions(getGameProfiles()),
+      selectedValue: profileState.selectedGameProfileId,
+      createLabel: 'Create new game...'
+    })}
+    ${renderProfileSelect({
+      id: 'gun-profile-select',
+      label: 'Gun profile',
+      options: getProfileOptions(getGunProfilesForCurrentGame()),
+      selectedValue: profileState.selectedGunProfileId,
+      createLabel: 'Create new gun...'
+    })}
     ${renderNumericControl({
       id: 'sensitivity',
       label: 'Sensitivity',
@@ -409,6 +464,8 @@ const hudElements = {
   hudPanel: document.querySelector('#hud-panel'),
   settingsPanel: document.querySelector('#settings-panel'),
   controlsPanel: document.querySelector('#controls-panel'),
+  gameProfileSelect: document.querySelector('#game-profile-select'),
+  gunProfileSelect: document.querySelector('#gun-profile-select'),
   responseCurveInput: document.querySelector('#response-curve-input'),
   invertYInput: document.querySelector('#invert-y-input'),
   showDebugShapesInput: document.querySelector('#show-debug-shapes-input'),
@@ -646,6 +703,14 @@ hudElements.invertYInput.addEventListener('change', (event) => {
 hudElements.showDebugShapesInput.addEventListener('change', (event) => {
   SETTINGS.showDebugShapes = event.target.checked;
   storeSettings();
+});
+
+hudElements.gameProfileSelect.addEventListener('change', (event) => {
+  handleGameProfileSelection(event.target.value);
+});
+
+hudElements.gunProfileSelect.addEventListener('change', (event) => {
+  handleGunProfileSelection(event.target.value);
 });
 
 initializePanelToggles();
@@ -1468,10 +1533,25 @@ function renderNumericControl({ id, label, min, max, step, value }) {
   `;
 }
 
+function renderProfileSelect({ id, label, options, selectedValue, createLabel }) {
+  return `
+    <label class="control-group" for="${id}">
+      <span>${label}</span>
+      <select id="${id}">
+        ${renderProfileOptions(options, selectedValue, createLabel)}
+      </select>
+    </label>
+  `;
+}
+
 function renderOptions(options, selectedValue) {
   return options
     .map((option) => `<option value="${option.value}" ${option.value === selectedValue ? 'selected' : ''}>${option.label}</option>`)
     .join('');
+}
+
+function renderProfileOptions(options, selectedValue, createLabel) {
+  return `${renderOptions(options, selectedValue)}<option value="${CREATE_NEW_PROFILE_VALUE}">${createLabel}</option>`;
 }
 
 function isButtonPressed(button) {
@@ -1504,75 +1584,68 @@ function sanitizeResponseCurve(value) {
   return RESPONSE_CURVE_OPTIONS.some((option) => option.value === value) ? value : DEFAULT_SETTINGS.responseCurve;
 }
 
-function loadStoredSettings() {
+function createSettingsProxy() {
+  return new Proxy(
+    {},
+    {
+      get(_target, property) {
+        if (typeof property !== 'string') {
+          return undefined;
+        }
+
+        if (GAME_SETTING_KEYS.includes(property)) {
+          return getCurrentGameProfile().settings[property];
+        }
+
+        if (GUN_SETTING_KEYS.includes(property)) {
+          return getCurrentGunProfile().settings[property];
+        }
+
+        return undefined;
+      },
+      set(_target, property, value) {
+        if (typeof property !== 'string') {
+          return false;
+        }
+
+        if (GAME_SETTING_KEYS.includes(property)) {
+          getCurrentGameProfile().settings[property] = value;
+          return true;
+        }
+
+        if (GUN_SETTING_KEYS.includes(property)) {
+          getCurrentGunProfile().settings[property] = value;
+          return true;
+        }
+
+        return false;
+      },
+      ownKeys() {
+        return [...GAME_SETTING_KEYS, ...GUN_SETTING_KEYS];
+      },
+      getOwnPropertyDescriptor() {
+        return { enumerable: true, configurable: true };
+      }
+    }
+  );
+}
+
+function loadProfileState() {
   const storedValue = window.localStorage.getItem(SETTINGS_STORAGE_KEY);
   if (!storedValue) {
-    return {};
+    return createDefaultProfileState(DEFAULT_SETTINGS);
   }
 
   try {
     const parsed = JSON.parse(storedValue);
-    const storedSettings = getStoredSettingsMap(parsed);
-    const legacySphereSpeed = clampSetting(storedSettings.sphereSpeed, 0.4, 2.5, 1.35);
-    const targetHorizontalSpeedMin =
-      typeof storedSettings.targetHorizontalSpeedMin === 'number'
-        ? storedSettings.targetHorizontalSpeedMin
-        : LEGACY_TARGET_SPEED_MIN * legacySphereSpeed;
-    const targetHorizontalSpeedMax =
-      typeof storedSettings.targetHorizontalSpeedMax === 'number'
-        ? storedSettings.targetHorizontalSpeedMax
-        : LEGACY_TARGET_SPEED_MAX * legacySphereSpeed;
+    if (parsed?.version === SETTINGS_STORAGE_VERSION && parsed?.gameProfiles) {
+      return sanitizeProfileState(parsed);
+    }
 
-    return {
-      lookSensitivity: clampSetting(storedSettings.lookSensitivity, 1, 10, DEFAULT_SETTINGS.lookSensitivity),
-      deadzone: clampSetting(storedSettings.deadzone, 0, 0.35, DEFAULT_SETTINGS.deadzone),
-      fov: clampSetting(storedSettings.fov, 50, 110, DEFAULT_SETTINGS.fov),
-      projectileRate: clampSetting(storedSettings.projectileRate, 1, 15, DEFAULT_SETTINGS.projectileRate),
-      bulletMagnetism: clampSetting(storedSettings.bulletMagnetism, 0, 1, DEFAULT_SETTINGS.bulletMagnetism),
-      aimSlow: clampSetting(storedSettings.aimSlow, 0, 1, DEFAULT_SETTINGS.aimSlow),
-      aimStickiness: clampSetting(storedSettings.aimStickiness, 0, 1, DEFAULT_SETTINGS.aimStickiness),
-      adsSnap: clampSetting(storedSettings.adsSnap, 0, 1, DEFAULT_SETTINGS.adsSnap),
-      showDebugShapes:
-        typeof storedSettings.showDebugShapes === 'boolean' ? storedSettings.showDebugShapes : DEFAULT_SETTINGS.showDebugShapes,
-      recoilYStrength: clampSetting(
-        storedSettings.recoilYStrength ?? storedSettings.recoilPatternStrength ?? storedSettings.sprayPatternStrength,
-        0.05,
-        2.5,
-        DEFAULT_SETTINGS.recoilYStrength
-      ),
-      recoilVariance: clampSetting(storedSettings.recoilVariance, 0, 10, DEFAULT_SETTINGS.recoilVariance),
-      recoilHorizontalOscillationStrength: clampSetting(
-        storedSettings.recoilHorizontalOscillationStrength,
-        0,
-        5,
-        DEFAULT_SETTINGS.recoilHorizontalOscillationStrength
-      ),
-      recoilHorizontalOscillationSpeed: clampSetting(
-        storedSettings.recoilHorizontalOscillationSpeed,
-        0.1,
-        3,
-        DEFAULT_SETTINGS.recoilHorizontalOscillationSpeed
-      ),
-      recoilIntensityOscillator: clampSetting(
-        storedSettings.recoilIntensityOscillator,
-        0,
-        1.5,
-        DEFAULT_SETTINGS.recoilIntensityOscillator
-      ),
-      recoilIntensityOscillationSpeed: clampSetting(
-        storedSettings.recoilIntensityOscillationSpeed,
-        0.1,
-        2,
-        DEFAULT_SETTINGS.recoilIntensityOscillationSpeed
-      ),
-      targetHorizontalSpeedMin: clampSetting(targetHorizontalSpeedMin, 0.1, 5, DEFAULT_SETTINGS.targetHorizontalSpeedMin),
-      targetHorizontalSpeedMax: clampSetting(targetHorizontalSpeedMax, 0.1, 5, DEFAULT_SETTINGS.targetHorizontalSpeedMax),
-      responseCurve: sanitizeResponseCurve(storedSettings.responseCurve),
-      invertY: typeof storedSettings.invertY === 'boolean' ? storedSettings.invertY : DEFAULT_SETTINGS.invertY
-    };
+    return createDefaultProfileState(getLegacyStoredSettingsMap(parsed));
   } catch (error) {
     console.error('Failed to parse stored controller settings.', error);
-    return {};
+    return createDefaultProfileState(DEFAULT_SETTINGS);
   }
 }
 
@@ -1581,32 +1654,14 @@ function storeSettings() {
     SETTINGS_STORAGE_KEY,
     JSON.stringify({
       version: SETTINGS_STORAGE_VERSION,
-      values: {
-        lookSensitivity: SETTINGS.lookSensitivity,
-        deadzone: SETTINGS.deadzone,
-        fov: SETTINGS.fov,
-        projectileRate: SETTINGS.projectileRate,
-        bulletMagnetism: SETTINGS.bulletMagnetism,
-        aimSlow: SETTINGS.aimSlow,
-        aimStickiness: SETTINGS.aimStickiness,
-        adsSnap: SETTINGS.adsSnap,
-        showDebugShapes: SETTINGS.showDebugShapes,
-        recoilYStrength: SETTINGS.recoilYStrength,
-        recoilVariance: SETTINGS.recoilVariance,
-        recoilHorizontalOscillationStrength: SETTINGS.recoilHorizontalOscillationStrength,
-        recoilHorizontalOscillationSpeed: SETTINGS.recoilHorizontalOscillationSpeed,
-        recoilIntensityOscillator: SETTINGS.recoilIntensityOscillator,
-        recoilIntensityOscillationSpeed: SETTINGS.recoilIntensityOscillationSpeed,
-        targetHorizontalSpeedMin: SETTINGS.targetHorizontalSpeedMin,
-        targetHorizontalSpeedMax: SETTINGS.targetHorizontalSpeedMax,
-        responseCurve: SETTINGS.responseCurve,
-        invertY: SETTINGS.invertY
-      }
+      selectedGameProfileId: profileState.selectedGameProfileId,
+      selectedGunProfileId: profileState.selectedGunProfileId,
+      gameProfiles: profileState.gameProfiles
     })
   );
 }
 
-function getStoredSettingsMap(parsed) {
+function getLegacyStoredSettingsMap(parsed) {
   if (Array.isArray(parsed)) {
     return LEGACY_SETTINGS_ORDER.reduce((settingsMap, key, index) => {
       if (index < parsed.length) {
@@ -1626,6 +1681,316 @@ function getStoredSettingsMap(parsed) {
   }
 
   return {};
+}
+
+function sanitizeProfileState(rawProfileState) {
+  const gameProfiles = {};
+  for (const [gameId, gameProfile] of Object.entries(rawProfileState.gameProfiles ?? {})) {
+    const gunProfiles = {};
+    for (const [gunId, gunProfile] of Object.entries(gameProfile.gunProfiles ?? {})) {
+      gunProfiles[gunId] = {
+        id: gunId,
+        name: sanitizeProfileName(gunProfile.name, DEFAULT_GUN_PROFILE_NAME),
+        settings: sanitizeGunSettings(gunProfile.settings ?? {})
+      };
+    }
+
+    if (Object.keys(gunProfiles).length === 0) {
+      const defaultGunId = createProfileId(DEFAULT_GUN_PROFILE_NAME, []);
+      gunProfiles[defaultGunId] = {
+        id: defaultGunId,
+        name: DEFAULT_GUN_PROFILE_NAME,
+        settings: sanitizeGunSettings(DEFAULT_SETTINGS)
+      };
+    }
+
+    gameProfiles[gameId] = {
+      id: gameId,
+      name: sanitizeProfileName(gameProfile.name, DEFAULT_GAME_PROFILE_NAME),
+      settings: sanitizeGameSettings(gameProfile.settings ?? {}),
+      gunProfiles
+    };
+  }
+
+  if (Object.keys(gameProfiles).length === 0) {
+    return createDefaultProfileState(DEFAULT_SETTINGS);
+  }
+
+  const selectedGameProfileId = gameProfiles[rawProfileState.selectedGameProfileId]
+    ? rawProfileState.selectedGameProfileId
+    : Object.keys(gameProfiles)[0];
+  const selectedGunProfileId = gameProfiles[selectedGameProfileId].gunProfiles[rawProfileState.selectedGunProfileId]
+    ? rawProfileState.selectedGunProfileId
+    : Object.keys(gameProfiles[selectedGameProfileId].gunProfiles)[0];
+
+  return { selectedGameProfileId, selectedGunProfileId, gameProfiles };
+}
+
+function createDefaultProfileState(flatSettings) {
+  const gameId = createProfileId(DEFAULT_GAME_PROFILE_NAME, []);
+  const gunId = createProfileId(DEFAULT_GUN_PROFILE_NAME, []);
+  return {
+    selectedGameProfileId: gameId,
+    selectedGunProfileId: gunId,
+    gameProfiles: {
+      [gameId]: {
+        id: gameId,
+        name: DEFAULT_GAME_PROFILE_NAME,
+        settings: sanitizeGameSettings(flatSettings),
+        gunProfiles: {
+          [gunId]: {
+            id: gunId,
+            name: DEFAULT_GUN_PROFILE_NAME,
+            settings: sanitizeGunSettings(flatSettings)
+          }
+        }
+      }
+    }
+  };
+}
+
+function sanitizeGameSettings(rawSettings) {
+  const legacySphereSpeed = clampSetting(rawSettings.sphereSpeed, 0.4, 2.5, 1.35);
+  const targetHorizontalSpeedMin =
+    typeof rawSettings.targetHorizontalSpeedMin === 'number'
+      ? rawSettings.targetHorizontalSpeedMin
+      : LEGACY_TARGET_SPEED_MIN * legacySphereSpeed;
+  const targetHorizontalSpeedMax =
+    typeof rawSettings.targetHorizontalSpeedMax === 'number'
+      ? rawSettings.targetHorizontalSpeedMax
+      : LEGACY_TARGET_SPEED_MAX * legacySphereSpeed;
+
+  return {
+    lookSensitivity: clampSetting(rawSettings.lookSensitivity, 1, 10, DEFAULT_SETTINGS.lookSensitivity),
+    deadzone: clampSetting(rawSettings.deadzone, 0, 0.35, DEFAULT_SETTINGS.deadzone),
+    invertY: typeof rawSettings.invertY === 'boolean' ? rawSettings.invertY : DEFAULT_SETTINGS.invertY,
+    fov: clampSetting(rawSettings.fov, 50, 110, DEFAULT_SETTINGS.fov),
+    responseCurve: sanitizeResponseCurve(rawSettings.responseCurve),
+    aimSlow: clampSetting(rawSettings.aimSlow, 0, 1, DEFAULT_SETTINGS.aimSlow),
+    aimStickiness: clampSetting(rawSettings.aimStickiness, 0, 1, DEFAULT_SETTINGS.aimStickiness),
+    adsSnap: clampSetting(rawSettings.adsSnap, 0, 1, DEFAULT_SETTINGS.adsSnap),
+    showDebugShapes:
+      typeof rawSettings.showDebugShapes === 'boolean' ? rawSettings.showDebugShapes : DEFAULT_SETTINGS.showDebugShapes,
+    targetHorizontalSpeedMin: clampSetting(targetHorizontalSpeedMin, 0.1, 5, DEFAULT_SETTINGS.targetHorizontalSpeedMin),
+    targetHorizontalSpeedMax: clampSetting(targetHorizontalSpeedMax, 0.1, 5, DEFAULT_SETTINGS.targetHorizontalSpeedMax),
+    targetCount: clampSetting(rawSettings.targetCount, 1, 32, DEFAULT_SETTINGS.targetCount),
+    targetRadius: clampSetting(rawSettings.targetRadius, 0.1, 2, DEFAULT_SETTINGS.targetRadius),
+    targetMaxHealth: clampSetting(rawSettings.targetMaxHealth, 1, 100, DEFAULT_SETTINGS.targetMaxHealth),
+    spawnDistanceMin: clampSetting(rawSettings.spawnDistanceMin, 1, 60, DEFAULT_SETTINGS.spawnDistanceMin),
+    spawnDistanceMax: clampSetting(rawSettings.spawnDistanceMax, 1, 120, DEFAULT_SETTINGS.spawnDistanceMax),
+    targetLifetimeMin: clampSetting(rawSettings.targetLifetimeMin, 1, 60, DEFAULT_SETTINGS.targetLifetimeMin),
+    targetLifetimeMax: clampSetting(rawSettings.targetLifetimeMax, 1, 60, DEFAULT_SETTINGS.targetLifetimeMax),
+    adsFovMultiplier: clampSetting(rawSettings.adsFovMultiplier, 0.2, 1, DEFAULT_SETTINGS.adsFovMultiplier),
+    adsSensitivityMultiplier: clampSetting(rawSettings.adsSensitivityMultiplier, 0.1, 1, DEFAULT_SETTINGS.adsSensitivityMultiplier),
+    hipFireSpreadPx: clampSetting(rawSettings.hipFireSpreadPx, 0, 100, DEFAULT_SETTINGS.hipFireSpreadPx),
+    adsSpreadPx: clampSetting(rawSettings.adsSpreadPx, 0, 100, DEFAULT_SETTINGS.adsSpreadPx),
+    hipFireSpreadNdc: clampSetting(rawSettings.hipFireSpreadNdc, 0, 0.2, DEFAULT_SETTINGS.hipFireSpreadNdc),
+    adsSpreadNdc: clampSetting(rawSettings.adsSpreadNdc, 0, 0.2, DEFAULT_SETTINGS.adsSpreadNdc),
+    shotSpreadKickPx: clampSetting(rawSettings.shotSpreadKickPx, 0, 100, DEFAULT_SETTINGS.shotSpreadKickPx),
+    shotSpreadKickNdc: clampSetting(rawSettings.shotSpreadKickNdc, 0, 0.2, DEFAULT_SETTINGS.shotSpreadKickNdc),
+    projectileSpeed: clampSetting(rawSettings.projectileSpeed, 1, 500, DEFAULT_SETTINGS.projectileSpeed),
+    projectileMaxDistance: clampSetting(rawSettings.projectileMaxDistance, 1, 200, DEFAULT_SETTINGS.projectileMaxDistance)
+  };
+}
+
+function sanitizeGunSettings(rawSettings) {
+  return {
+    projectileRate: clampSetting(rawSettings.projectileRate, 1, 15, DEFAULT_SETTINGS.projectileRate),
+    bulletMagnetism: clampSetting(rawSettings.bulletMagnetism, 0, 1, DEFAULT_SETTINGS.bulletMagnetism),
+    recoilYStrength: clampSetting(
+      rawSettings.recoilYStrength ?? rawSettings.recoilPatternStrength ?? rawSettings.sprayPatternStrength,
+      0.05,
+      2.5,
+      DEFAULT_SETTINGS.recoilYStrength
+    ),
+    recoilVariance: clampSetting(rawSettings.recoilVariance, 0, 10, DEFAULT_SETTINGS.recoilVariance),
+    recoilHorizontalOscillationStrength: clampSetting(
+      rawSettings.recoilHorizontalOscillationStrength,
+      0,
+      5,
+      DEFAULT_SETTINGS.recoilHorizontalOscillationStrength
+    ),
+    recoilHorizontalOscillationSpeed: clampSetting(
+      rawSettings.recoilHorizontalOscillationSpeed,
+      0.1,
+      3,
+      DEFAULT_SETTINGS.recoilHorizontalOscillationSpeed
+    ),
+    recoilIntensityOscillator: clampSetting(
+      rawSettings.recoilIntensityOscillator,
+      0,
+      1.5,
+      DEFAULT_SETTINGS.recoilIntensityOscillator
+    ),
+    recoilIntensityOscillationSpeed: clampSetting(
+      rawSettings.recoilIntensityOscillationSpeed,
+      0.1,
+      2,
+      DEFAULT_SETTINGS.recoilIntensityOscillationSpeed
+    )
+  };
+}
+
+function getGameProfiles() {
+  return Object.values(profileState.gameProfiles);
+}
+
+function getCurrentGameProfile() {
+  if (!profileState.gameProfiles[profileState.selectedGameProfileId]) {
+    profileState.selectedGameProfileId = Object.keys(profileState.gameProfiles)[0];
+  }
+
+  return profileState.gameProfiles[profileState.selectedGameProfileId];
+}
+
+function getGunProfilesForCurrentGame() {
+  return Object.values(getCurrentGameProfile().gunProfiles);
+}
+
+function getCurrentGunProfile() {
+  const currentGameProfile = getCurrentGameProfile();
+  if (!currentGameProfile.gunProfiles[profileState.selectedGunProfileId]) {
+    profileState.selectedGunProfileId = Object.keys(currentGameProfile.gunProfiles)[0];
+  }
+
+  return currentGameProfile.gunProfiles[profileState.selectedGunProfileId];
+}
+
+function getProfileOptions(profiles) {
+  return profiles.map((profile) => ({ value: profile.id, label: profile.name }));
+}
+
+function handleGameProfileSelection(selectedValue) {
+  if (selectedValue === CREATE_NEW_PROFILE_VALUE) {
+    createGameProfileFromPrompt();
+    return;
+  }
+
+  profileState.selectedGameProfileId = selectedValue;
+  profileState.selectedGunProfileId = Object.keys(getCurrentGameProfile().gunProfiles)[0];
+  syncProfileUi();
+  storeSettings();
+}
+
+function handleGunProfileSelection(selectedValue) {
+  if (selectedValue === CREATE_NEW_PROFILE_VALUE) {
+    createGunProfileFromPrompt();
+    return;
+  }
+
+  profileState.selectedGunProfileId = selectedValue;
+  syncProfileUi();
+  storeSettings();
+}
+
+function createGameProfileFromPrompt() {
+  const name = window.prompt('Enter a name for the new game profile:', DEFAULT_GAME_PROFILE_NAME)?.trim();
+  if (!name) {
+    syncProfileSelectors();
+    return;
+  }
+
+  const gameId = createProfileId(name, Object.keys(profileState.gameProfiles));
+  const currentGameProfile = getCurrentGameProfile();
+  const currentGunProfile = getCurrentGunProfile();
+  const gunId = createProfileId(currentGunProfile.name, []);
+  profileState.gameProfiles[gameId] = {
+    id: gameId,
+    name,
+    settings: { ...currentGameProfile.settings },
+    gunProfiles: {
+      [gunId]: {
+        id: gunId,
+        name: currentGunProfile.name,
+        settings: { ...currentGunProfile.settings }
+      }
+    }
+  };
+  profileState.selectedGameProfileId = gameId;
+  profileState.selectedGunProfileId = gunId;
+  syncProfileUi();
+  storeSettings();
+}
+
+function createGunProfileFromPrompt() {
+  const name = window.prompt('Enter a name for the new gun profile:', DEFAULT_GUN_PROFILE_NAME)?.trim();
+  if (!name) {
+    syncProfileSelectors();
+    return;
+  }
+
+  const currentGameProfile = getCurrentGameProfile();
+  const gunId = createProfileId(name, Object.keys(currentGameProfile.gunProfiles));
+  currentGameProfile.gunProfiles[gunId] = {
+    id: gunId,
+    name,
+    settings: { ...getCurrentGunProfile().settings }
+  };
+  profileState.selectedGunProfileId = gunId;
+  syncProfileUi();
+  storeSettings();
+}
+
+function syncProfileUi() {
+  syncProfileSelectors();
+  syncSettingControls();
+}
+
+function syncProfileSelectors() {
+  hudElements.gameProfileSelect.innerHTML = renderProfileOptions(
+    getProfileOptions(getGameProfiles()),
+    profileState.selectedGameProfileId,
+    'Create new game...'
+  );
+  hudElements.gunProfileSelect.innerHTML = renderProfileOptions(
+    getProfileOptions(getGunProfilesForCurrentGame()),
+    profileState.selectedGunProfileId,
+    'Create new gun...'
+  );
+  hudElements.gameProfileSelect.value = profileState.selectedGameProfileId;
+  hudElements.gunProfileSelect.value = profileState.selectedGunProfileId;
+}
+
+function syncSettingControls() {
+  setNumericControlValue('sensitivity', SETTINGS.lookSensitivity);
+  setNumericControlValue('deadzone', SETTINGS.deadzone);
+  setNumericControlValue('fov', SETTINGS.fov);
+  setNumericControlValue('projectile-rate', SETTINGS.projectileRate);
+  setNumericControlValue('bullet-magnetism', SETTINGS.bulletMagnetism);
+  setNumericControlValue('aim-slow', SETTINGS.aimSlow);
+  setNumericControlValue('aim-stickiness', SETTINGS.aimStickiness);
+  setNumericControlValue('ads-snap', SETTINGS.adsSnap);
+  setNumericControlValue('target-speed-min', SETTINGS.targetHorizontalSpeedMin);
+  setNumericControlValue('target-speed-max', SETTINGS.targetHorizontalSpeedMax);
+  setNumericControlValue('recoil-y-strength', SETTINGS.recoilYStrength);
+  setNumericControlValue('recoil-variance', SETTINGS.recoilVariance);
+  setNumericControlValue('recoil-horizontal-oscillation', SETTINGS.recoilHorizontalOscillationStrength);
+  setNumericControlValue('recoil-horizontal-oscillation-speed', SETTINGS.recoilHorizontalOscillationSpeed);
+  setNumericControlValue('recoil-intensity-oscillator', SETTINGS.recoilIntensityOscillator);
+  setNumericControlValue('recoil-intensity-oscillation-speed', SETTINGS.recoilIntensityOscillationSpeed);
+  hudElements.responseCurveInput.value = SETTINGS.responseCurve;
+  hudElements.invertYInput.checked = SETTINGS.invertY;
+  hudElements.showDebugShapesInput.checked = SETTINGS.showDebugShapes;
+}
+
+function sanitizeProfileName(value, fallback) {
+  return typeof value === 'string' && value.trim() ? value.trim() : fallback;
+}
+
+function createProfileId(name, existingIds) {
+  const baseId = sanitizeProfileName(name, 'profile')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '') || 'profile';
+  let profileId = baseId;
+  let suffix = 2;
+
+  while (existingIds.includes(profileId)) {
+    profileId = `${baseId}-${suffix}`;
+    suffix += 1;
+  }
+
+  return profileId;
 }
 
 function getCameraOrigin() {

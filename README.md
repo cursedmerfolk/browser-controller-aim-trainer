@@ -8,6 +8,7 @@ The app uses:
 - Three.js for simple 3D rendering
 - Browser Gamepad API for controller input
 - Keyboard fallback controls for testing without a controller
+- Game and gun setting profiles with selectable dropdowns and create-new prompts
 - Live controller tuning controls for sensitivity, deadzone, FOV, invert-Y, and response curves
 - Live projectile-rate, aim-assist, min/max target-speed, and recoil tuning controls with keyboard-editable numeric inputs
 - ADS with a simple rifle viewmodel, tighter aim handling, and automatic fire
@@ -40,7 +41,7 @@ The proof of concept is ready when the browser shows:
 - a rifle-like held weapon in first person
 - a dynamic tick-mark crosshair that tightens when aiming down sights
 - score, hits, shots, accuracy, and raw stick values in the HUD
-- a controller settings panel for sensitivity, deadzone, FOV, projectile rate, bullet magnetism, aim slow, aim stickiness, ADS snap, min target speed, max target speed, recoil Y strength, recoil variance, recoil horizontal oscillation, recoil horizontal oscillation speed, recoil intensity oscillator, recoil intensity oscillator speed, invert-Y, show debug shapes, and response curves
+- a controller settings panel with game profile and gun profile selectors, plus sensitivity, deadzone, FOV, projectile rate, bullet magnetism, aim slow, aim stickiness, ADS snap, min target speed, max target speed, recoil Y strength, recoil variance, recoil horizontal oscillation, recoil horizontal oscillation speed, recoil intensity oscillator, recoil intensity oscillator speed, invert-Y, show debug shapes, and response curves
 - keyboard fallback aiming and shooting if no controller is connected
 
 ## Local scripts
