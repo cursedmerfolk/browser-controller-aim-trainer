@@ -38,42 +38,70 @@ canvas {
 }
 
 .crosshair {
+  --gap: 18px;
+  --tick-length: 12px;
   position: fixed;
   left: 50%;
   top: 50%;
-  width: 28px;
-  height: 28px;
+  width: 120px;
+  height: 120px;
   transform: translate(-50%, -50%);
   pointer-events: none;
 }
 
-.crosshair::before,
-.crosshair::after {
-  content: "";
+.crosshair-dot,
+.crosshair-tick {
   position: absolute;
   background: rgba(255, 255, 255, 0.95);
-  box-shadow: 0 0 8px rgba(255, 255, 255, 0.75);
+  box-shadow: 0 0 8px rgba(255, 255, 255, 0.7);
 }
 
-.crosshair::before {
-  left: 13px;
-  top: 2px;
+.crosshair-dot {
+  left: 50%;
+  top: 50%;
+  width: 4px;
+  height: 4px;
+  border-radius: 999px;
+  transform: translate(-50%, -50%);
+}
+
+.crosshair-tick-top,
+.crosshair-tick-bottom {
+  left: 50%;
   width: 2px;
-  height: 24px;
+  height: var(--tick-length);
+  transform: translateX(-50%);
 }
 
-.crosshair::after {
-  left: 2px;
-  top: 13px;
-  width: 24px;
+.crosshair-tick-left,
+.crosshair-tick-right {
+  top: 50%;
+  width: var(--tick-length);
   height: 2px;
+  transform: translateY(-50%);
+}
+
+.crosshair-tick-top {
+  top: calc(50% - var(--gap) - var(--tick-length));
+}
+
+.crosshair-tick-bottom {
+  top: calc(50% + var(--gap));
+}
+
+.crosshair-tick-left {
+  left: calc(50% - var(--gap) - var(--tick-length));
+}
+
+.crosshair-tick-right {
+  left: calc(50% + var(--gap));
 }
 
 .instructions {
   position: fixed;
   right: 16px;
   bottom: 16px;
-  max-width: 360px;
+  max-width: 380px;
   font-size: 13px;
   line-height: 1.45;
 }
@@ -82,7 +110,7 @@ canvas {
   position: fixed;
   top: 16px;
   right: 16px;
-  width: min(320px, calc(100vw - 32px));
+  width: min(360px, calc(100vw - 32px));
   gap: 12px;
 }
 
@@ -91,20 +119,38 @@ canvas {
   gap: 6px;
 }
 
-.control-group span {
-  display: flex;
-  justify-content: space-between;
-  gap: 12px;
+.control-inputs {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 92px;
+  gap: 10px;
+  align-items: center;
 }
 
-.control-group input[type='range'] {
+.control-group input[type='range'],
+.control-group select {
   width: 100%;
+}
+
+.control-number,
+.control-group select {
+  padding: 8px 10px;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 8px;
+  background: rgba(11, 16, 32, 0.92);
+  color: white;
+  font: inherit;
 }
 
 .checkbox-row {
   display: flex;
   align-items: center;
   gap: 10px;
+}
+
+.button-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
 }
 
 button {
@@ -118,14 +164,14 @@ button {
   background: #f5f7fb;
 }
 
-@media (max-width: 900px) {
+@media (max-width: 980px) {
   .settings-panel {
-   top: auto;
-   right: 16px;
-   bottom: 148px;
+    top: auto;
+    right: 16px;
+    bottom: 206px;
   }
 
   .instructions {
-   max-width: min(360px, calc(100vw - 32px));
+    max-width: min(380px, calc(100vw - 32px));
   }
 }

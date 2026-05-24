@@ -8,7 +8,10 @@ The app uses:
 - Three.js for simple 3D rendering
 - Browser Gamepad API for controller input
 - Keyboard fallback controls for testing without a controller
-- Live controller tuning controls for sensitivity, deadzone, and invert-Y
+- Live controller tuning controls for sensitivity, deadzone, FOV, invert-Y, and response curves
+- Live projectile-rate and spray-pattern tuning controls with keyboard-editable numeric inputs
+- ADS with a simple rifle viewmodel, tighter aim handling, and automatic fire
+- Moving multi-hit targets that shift from green to red as they take damage
 - VS Code Dev Containers for a reproducible development environment
 
 ## Getting started in VS Code Dev Containers
@@ -31,9 +34,11 @@ http://localhost:5173
 The proof of concept is ready when the browser shows:
 
 - a 3D range with floating sphere targets
-- a centered crosshair
+- visible projectile tracers that animate even though hits are resolved immediately
+- a rifle-like held weapon in first person
+- a dynamic tick-mark crosshair that tightens when aiming down sights
 - score, hits, shots, accuracy, and raw stick values in the HUD
-- a controller settings panel for sensitivity, deadzone, and invert-Y
+- a controller settings panel for sensitivity, deadzone, FOV, projectile rate, spray pattern, invert-Y, and response curves
 - keyboard fallback aiming and shooting if no controller is connected
 
 ## Local scripts
@@ -48,12 +53,14 @@ npm run build
 Controller:
 
 - Right stick: aim
-- Right trigger / R2: shoot
+- Left trigger / L2: aim down sights
+- Right trigger / R2: fire
 
 Keyboard fallback:
 
 - WASD or arrow keys: aim
-- Space: shoot
+- Shift: aim down sights
+- Space: fire
 
 ## Browser notes
 
