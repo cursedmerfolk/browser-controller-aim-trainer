@@ -206,13 +206,7 @@ app.innerHTML = `
       selectedValue: profileState.selectedGameProfileId,
       createLabel: 'Create new game...'
     })}
-    ${renderProfileSelect({
-      id: 'gun-profile-select',
-      label: 'Gun profile',
-      options: getProfileOptions(getGunProfilesForCurrentGame()),
-      selectedValue: profileState.selectedGunProfileId,
-      createLabel: 'Create new gun...'
-    })}
+    <strong>Game settings</strong>
     ${renderNumericControl({
       id: 'sensitivity',
       label: 'Sensitivity',
@@ -236,22 +230,6 @@ app.innerHTML = `
       max: 110,
       step: 1,
       value: SETTINGS.fov
-    })}
-    ${renderNumericControl({
-      id: 'projectile-rate',
-      label: 'Projectile rate',
-      min: 1,
-      max: 15,
-      step: 0.5,
-      value: SETTINGS.projectileRate
-    })}
-    ${renderNumericControl({
-      id: 'bullet-magnetism',
-      label: 'Bullet magnetism',
-      min: 0,
-      max: 1,
-      step: 0.01,
-      value: SETTINGS.bulletMagnetism
     })}
     ${renderNumericControl({
       id: 'aim-slow',
@@ -292,6 +270,44 @@ app.innerHTML = `
       max: 5,
       step: 0.05,
       value: SETTINGS.targetHorizontalSpeedMax
+    })}
+    <label class="control-group" for="response-curve-input">
+      <span>Response curve</span>
+      <select id="response-curve-input">
+        ${renderOptions(RESPONSE_CURVE_OPTIONS, SETTINGS.responseCurve)}
+      </select>
+    </label>
+    <label class="checkbox-row" for="invert-y-input">
+      <input id="invert-y-input" type="checkbox" ${SETTINGS.invertY ? 'checked' : ''} />
+      <span>Invert Y</span>
+    </label>
+    <label class="checkbox-row" for="show-debug-shapes-input">
+      <input id="show-debug-shapes-input" type="checkbox" ${SETTINGS.showDebugShapes ? 'checked' : ''} />
+      <span>Show debug shapes</span>
+    </label>
+    ${renderProfileSelect({
+      id: 'gun-profile-select',
+      label: 'Gun profile',
+      options: getProfileOptions(getGunProfilesForCurrentGame()),
+      selectedValue: profileState.selectedGunProfileId,
+      createLabel: 'Create new gun...'
+    })}
+    <strong>Gun settings</strong>
+    ${renderNumericControl({
+      id: 'projectile-rate',
+      label: 'Projectile rate',
+      min: 1,
+      max: 15,
+      step: 0.5,
+      value: SETTINGS.projectileRate
+    })}
+    ${renderNumericControl({
+      id: 'bullet-magnetism',
+      label: 'Bullet magnetism',
+      min: 0,
+      max: 1,
+      step: 0.01,
+      value: SETTINGS.bulletMagnetism
     })}
     ${renderNumericControl({
       id: 'recoil-y-strength',
@@ -341,20 +357,6 @@ app.innerHTML = `
       step: 0.05,
       value: SETTINGS.recoilIntensityOscillationSpeed
     })}
-    <label class="control-group" for="response-curve-input">
-      <span>Response curve</span>
-      <select id="response-curve-input">
-        ${renderOptions(RESPONSE_CURVE_OPTIONS, SETTINGS.responseCurve)}
-      </select>
-    </label>
-    <label class="checkbox-row" for="invert-y-input">
-      <input id="invert-y-input" type="checkbox" ${SETTINGS.invertY ? 'checked' : ''} />
-      <span>Invert Y</span>
-    </label>
-    <label class="checkbox-row" for="show-debug-shapes-input">
-      <input id="show-debug-shapes-input" type="checkbox" ${SETTINGS.showDebugShapes ? 'checked' : ''} />
-      <span>Show debug shapes</span>
-    </label>
     </div>
   </div>
   <div class="hud-panel instructions edge-panel is-collapsed" id="controls-panel" data-side="left">
