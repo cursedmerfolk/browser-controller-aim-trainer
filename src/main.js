@@ -22,12 +22,12 @@ const BODY_SHOT_DAMAGE = 1;
 const HEAD_SHOT_DAMAGE = 1.5;
 const PLAYER_EYE_HEIGHT = 2.2;
 const PLAYER_MAX_HEALTH = 5;
-const PLAYER_STRAFE_SPEED = 5.5;
+const PLAYER_STRAFE_SPEED = 12;
 const TARGET_FIRE_INTERVAL_MIN = 1.4;
 const TARGET_FIRE_INTERVAL_MAX = 2.6;
 const TARGET_PROJECTILE_DAMAGE = 1;
 const TARGET_PROJECTILE_HIT_RADIUS = 0.4;
-const TARGET_PROJECTILE_SPEED = 18;
+const TARGET_PROJECTILE_SPEED = 54;
 const CENTER_SCREEN = new THREE.Vector2(0, 0);
 const BULLET_MAGNETISM_CONE_ANGLE = THREE.MathUtils.degToRad(1);
 const ADS_SNAP_CYLINDER_RADIUS = 1;
@@ -163,6 +163,9 @@ const state = {
   pendingMouseLookY: 0,
   mouseShootPressed: false,
   mouseAdsPressed: false,
+  damageFlash: 0,
+  damageFlinch: 0,
+  damageFlinchDirection: 1,
   playerVelocity: new THREE.Vector3(),
   isAimingDownSights: false,
   aimBlend: 0,
@@ -215,6 +218,7 @@ app.innerHTML = `
     <span class="crosshair-tick crosshair-tick-bottom"></span>
     <span class="crosshair-tick crosshair-tick-left"></span>
   </div>
+  <div class="damage-overlay" id="damage-overlay" aria-hidden="true"></div>
   <div class="hud-panel axis-legend" aria-live="polite">
     <strong>World axes</strong>
     <div>X+: right | X-: left</div>
@@ -548,6 +552,7 @@ const hudElements = {
   status: document.querySelector('#status'),
   rawStick: document.querySelector('#raw-stick'),
   crosshair: document.querySelector('#crosshair'),
+  damageOverlay: document.querySelector('#damage-overlay'),
   hudPanel: document.querySelector('#hud-panel'),
   settingsPanel: document.querySelector('#settings-panel'),
   controlsPanel: document.querySelector('#controls-panel'),
@@ -661,6 +666,8 @@ hudElements.resetButton.addEventListener('click', () => {
   state.pendingMouseLookY = 0;
   state.mouseShootPressed = false;
   state.mouseAdsPressed = false;
+  state.damageFlash = 0;
+  state.damageFlinch = 0;
   camera.position.set(0, PLAYER_EYE_HEIGHT, 0);
   previousCameraOrigin.copy(camera.position);
   updateCamera();
@@ -979,8 +986,8 @@ function getInputState() {
     controllerLookX = processStickAxis(state.rawStickX);
     controllerLookY = processStickAxis(state.rawStickY);
     moveX += processStickAxis(pad.axes[0] ?? 0);
-    shootPressed = shootPressed || isButtonPressed(pad.buttons[7]) || isButtonPressed(pad.buttons[5]);
-    adsPressed = adsPressed || isButtonPressed(pad.buttons[6]) || isButtonPressed(pad.buttons[4]);
+    shootPressed = shootPressed || getGamepadShootPressed(pad);
+    adsPressed = adsPressed || getGamepadAdsPressed(pad);
   } else {
     state.rawStickX = 0;
     state.rawStickY = 0;
@@ -1097,6 +1104,8 @@ function updateAimState(delta, adsPressed, shootPressed) {
   state.aimBlend = THREE.MathUtils.lerp(state.aimBlend, adsPressed ? 1 : 0, 1 - Math.exp(-delta * 14));
   state.spreadKick = Math.max(0, state.spreadKick - delta * 3.5);
   state.weaponKick = Math.max(0, state.weaponKick - delta * 6);
+  state.damageFlash = Math.max(0, state.damageFlash - delta * 2.6);
+  state.damageFlinch = Math.max(0, state.damageFlinch - delta * 6.5);
   state.recoilPatternX = THREE.MathUtils.lerp(state.recoilPatternX, 0, 1 - Math.exp(-delta * 10));
   state.recoilPatternY = THREE.MathUtils.lerp(state.recoilPatternY, 0, 1 - Math.exp(-delta * 8));
 
@@ -1129,7 +1138,7 @@ function isAdsSnapActive() {
 }
 
 function applyPlayerMovement(moveX, delta) {
-  if (moveX === 0 || state.isGameOver) {
+  if (moveX === 0) {
     return;
   }
 
@@ -1140,8 +1149,14 @@ function applyPlayerMovement(moveX, delta) {
 
 function updateCamera() {
   camera.rotation.order = 'YXZ';
-  camera.rotation.y = state.yaw;
-  camera.rotation.x = state.pitch;
+  const flinchProgress = 1 - state.damageFlinch;
+  const flinchYaw = Math.sin(flinchProgress * Math.PI * 3) * 0.014 * state.damageFlinchDirection * state.damageFlinch;
+  const flinchPitch = Math.sin(flinchProgress * Math.PI * 4) * 0.01 * state.damageFlinch;
+  const flinchRoll = Math.sin(flinchProgress * Math.PI * 3.5) * 0.02 * state.damageFlinchDirection * state.damageFlinch;
+
+  camera.rotation.y = state.yaw + flinchYaw;
+  camera.rotation.x = state.pitch + flinchPitch;
+  camera.rotation.z = flinchRoll;
 
   const targetFov = THREE.MathUtils.lerp(SETTINGS.fov, getAdsFov(), state.aimBlend);
   if (Math.abs(camera.fov - targetFov) > 0.01) {
@@ -1429,6 +1444,9 @@ function applyDamageToPlayer(amount) {
   }
 
   state.playerHealth = Math.max(0, state.playerHealth - amount);
+  state.damageFlash = 1;
+  state.damageFlinch = 1;
+  state.damageFlinchDirection = Math.random() < 0.5 ? -1 : 1;
   if (state.playerHealth > 0) {
     return;
   }
@@ -1821,6 +1839,7 @@ function getBaseWeaponTransform() {
 function updateCrosshair() {
   hudElements.crosshair.style.setProperty('--gap', `${getCurrentSpreadPx().toFixed(1)}px`);
   hudElements.crosshair.dataset.mode = state.isAimingDownSights ? 'ads' : 'hip';
+  hudElements.damageOverlay.style.opacity = String(state.damageFlash * 0.16);
 }
 
 function updateHud() {
@@ -1936,8 +1955,33 @@ function renderProfileOptions(options, selectedValue, createLabel) {
   return `${renderOptions(options, selectedValue)}<option value="${CREATE_NEW_PROFILE_VALUE}">${createLabel}</option>`;
 }
 
-function isButtonPressed(button) {
-  return Boolean(button?.pressed || (button?.value ?? 0) > 0.25);
+function getButtonValue(button) {
+  return button?.value ?? (button?.pressed ? 1 : 0) ?? 0;
+}
+
+function getAxisTriggerValue(axisValue) {
+  if (typeof axisValue !== 'number' || Number.isNaN(axisValue)) {
+    return 0;
+  }
+
+  return THREE.MathUtils.clamp((axisValue + 1) / 2, 0, 1);
+}
+
+function getGamepadShootPressed(pad) {
+  return (
+    getButtonValue(pad.buttons[7]) > 0.05 ||
+    getButtonValue(pad.buttons[5]) > 0.05 ||
+    getButtonValue(pad.buttons[0]) > 0.05 ||
+    getAxisTriggerValue(pad.axes[5]) > 0.55
+  );
+}
+
+function getGamepadAdsPressed(pad) {
+  return (
+    getButtonValue(pad.buttons[6]) > 0.05 ||
+    getButtonValue(pad.buttons[4]) > 0.05 ||
+    getAxisTriggerValue(pad.axes[4]) > 0.55
+  );
 }
 
 function randomRange(min, max) {
