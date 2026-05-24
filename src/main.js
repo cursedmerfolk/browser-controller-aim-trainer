@@ -79,7 +79,16 @@ const state = {
 
 const app = document.querySelector('#app');
 app.innerHTML = `
-  <div class="hud-panel hud">
+  <div class="hud-panel hud edge-panel" id="hud-panel" data-side="left">
+    <button
+      class="panel-toggle"
+      id="hud-panel-toggle"
+      type="button"
+      aria-expanded="true"
+      aria-label="Collapse Controller Aim Trainer panel"
+    >
+      <span aria-hidden="true">‹</span>
+    </button>
     <strong>Controller Aim Trainer</strong>
     <div id="gamepad-status">Controller: ${state.gamepadName}</div>
     <div id="mode-status">Aim mode: HIP FIRE</div>
@@ -97,7 +106,16 @@ app.innerHTML = `
     <span class="crosshair-tick crosshair-tick-bottom"></span>
     <span class="crosshair-tick crosshair-tick-left"></span>
   </div>
-  <div class="hud-panel settings-panel" id="settings-panel">
+  <div class="hud-panel settings-panel edge-panel" id="settings-panel" data-side="right">
+    <button
+      class="panel-toggle"
+      id="settings-panel-toggle"
+      type="button"
+      aria-expanded="true"
+      aria-label="Collapse Controller settings panel"
+    >
+      <span aria-hidden="true">›</span>
+    </button>
     <strong>Controller settings</strong>
     ${renderNumericControl({
       id: 'sensitivity',
@@ -164,7 +182,16 @@ app.innerHTML = `
       <span>Invert Y</span>
     </label>
   </div>
-  <div class="hud-panel instructions">
+  <div class="hud-panel instructions edge-panel" id="controls-panel" data-side="left">
+    <button
+      class="panel-toggle"
+      id="controls-panel-toggle"
+      type="button"
+      aria-expanded="true"
+      aria-label="Collapse Controls panel"
+    >
+      <span aria-hidden="true">‹</span>
+    </button>
     <div><strong>Controls</strong></div>
     <div>Right stick: aim</div>
     <div>Left trigger / L2: aim down sights</div>
@@ -251,6 +278,9 @@ const hudElements = {
   shots: document.querySelector('#shots'),
   rawStick: document.querySelector('#raw-stick'),
   crosshair: document.querySelector('#crosshair'),
+  hudPanel: document.querySelector('#hud-panel'),
+  settingsPanel: document.querySelector('#settings-panel'),
+  controlsPanel: document.querySelector('#controls-panel'),
   responseCurveInput: document.querySelector('#response-curve-input'),
   sprayPatternInput: document.querySelector('#spray-pattern-input'),
   invertYInput: document.querySelector('#invert-y-input'),
@@ -381,6 +411,8 @@ hudElements.invertYInput.addEventListener('change', (event) => {
   SETTINGS.invertY = event.target.checked;
   storeSettings();
 });
+
+initializePanelToggles();
 
 function loop() {
   const delta = clock.getDelta();
@@ -864,6 +896,28 @@ function bindNumericSetting({ id, min, max, fallback, onChange }) {
   numberInput.addEventListener('blur', (event) => {
     applyValue(event.target.value);
   });
+}
+
+function initializePanelToggles() {
+  const panels = [hudElements.hudPanel, hudElements.settingsPanel, hudElements.controlsPanel];
+
+  for (const panel of panels) {
+    const toggle = panel.querySelector('.panel-toggle');
+    toggle.addEventListener('click', () => {
+      const collapsed = panel.classList.toggle('is-collapsed');
+      const side = panel.dataset.side;
+      toggle.setAttribute('aria-expanded', String(!collapsed));
+      toggle.querySelector('span').textContent = getPanelToggleSymbol(side, collapsed);
+    });
+  }
+}
+
+function getPanelToggleSymbol(side, collapsed) {
+  if (side === 'right') {
+    return collapsed ? '‹' : '›';
+  }
+
+  return collapsed ? '›' : '‹';
 }
 
 function renderNumericControl({ id, label, min, max, step, value }) {

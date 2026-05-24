@@ -21,6 +21,7 @@ canvas {
 }
 
 .hud-panel {
+  position: relative;
   display: grid;
   gap: 8px;
   padding: 12px 14px;
@@ -31,10 +32,50 @@ canvas {
   box-shadow: 0 14px 40px rgba(0, 0, 0, 0.22);
   font-size: 14px;
   line-height: 1.3;
+  transition: transform 160ms ease;
 }
 
 .hud-panel strong {
   font-size: 16px;
+}
+
+.edge-panel[data-side='left'] {
+  padding-right: 46px;
+}
+
+.edge-panel[data-side='right'] {
+  padding-left: 46px;
+}
+
+.panel-toggle {
+  position: absolute;
+  top: 10px;
+  z-index: 1;
+  width: 28px;
+  height: 28px;
+  margin: 0;
+  padding: 0;
+  border-radius: 999px;
+  display: grid;
+  place-items: center;
+  color: white;
+  background: rgba(255, 255, 255, 0.14);
+}
+
+.edge-panel[data-side='left'] .panel-toggle {
+  right: 10px;
+}
+
+.edge-panel[data-side='right'] .panel-toggle {
+  left: 10px;
+}
+
+.edge-panel.is-collapsed[data-side='left'] {
+  transform: translateX(calc(-100% + 46px));
+}
+
+.edge-panel.is-collapsed[data-side='right'] {
+  transform: translateX(calc(100% - 46px));
 }
 
 .crosshair {
