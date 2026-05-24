@@ -6,6 +6,7 @@ const SETTINGS_STORAGE_VERSION = 3;
 
 const RESPONSE_CURVE_OPTIONS = [
   { value: 'linear', label: 'Linear' },
+  { value: 'relaxed', label: 'Relaxed' },
   { value: 'exponential', label: 'Exponential' },
   { value: 'inverse-s', label: 'Inverse S' }
 ];
@@ -33,6 +34,7 @@ const TARGET_PROJECTILE_HIT_RADIUS = 0.4;
 const TARGET_PROJECTILE_SPEED = 72;
 const TARGET_SPAWN_WIDTH_FACTOR = 0.14;
 const CENTER_SCREEN = new THREE.Vector2(0, 0);
+const AIM_SLOW_CONE_ANGLE = THREE.MathUtils.degToRad(2);
 const BULLET_MAGNETISM_CONE_ANGLE = THREE.MathUtils.degToRad(1);
 const ADS_SNAP_CYLINDER_RADIUS = 1;
 const DEBUG_VISUAL_OFFSET = 0.2;
@@ -1145,6 +1147,8 @@ function applyResponseCurve(value) {
   const magnitude = Math.abs(value);
 
   switch (SETTINGS.responseCurve) {
+    case 'relaxed':
+      return sign * magnitude ** 4;
     case 'exponential':
       return sign * magnitude ** 2.2;
     case 'inverse-s':
@@ -2714,7 +2718,7 @@ function getDirectAimTarget() {
 }
 
 function getAimSlowTarget() {
-  return getNearestTargetInCone(getCameraOrigin(), getCameraForward(), BULLET_MAGNETISM_CONE_ANGLE);
+  return getNearestTargetInCone(getCameraOrigin(), getCameraForward(), AIM_SLOW_CONE_ANGLE);
 }
 
 function getTargetAimPoint(target, origin = getCameraOrigin(), direction = getCameraForward()) {
