@@ -659,8 +659,10 @@ function loop() {
   applyLookInput(input.lookX, input.lookY, delta, directAimTarget, input.usingGamepad);
   updateCamera();
   updatePlayerVelocity(delta);
-  updateFiring(delta, input.shootPressed);
-  applyAimAssist(delta);
+  const firedThisFrame = updateFiring(delta, input.shootPressed);
+  if (!firedThisFrame) {
+    applyAimAssist(delta);
+  }
   updateCamera();
   updateAimAssistDebugVisuals();
   updateWeaponTransform();
@@ -830,20 +832,24 @@ function updateFiring(delta, shootPressed) {
 
   if (!shootPressed) {
     state.fireCooldown = 0;
-    return;
+    return false;
   }
 
   const shotInterval = 1 / SETTINGS.projectileRate;
   let remainingShots = 4;
+  let firedShots = 0;
 
   while (state.fireCooldown <= 0 && remainingShots > 0) {
-    fireShot();
+    fireShot(delta);
     state.fireCooldown += shotInterval;
     remainingShots -= 1;
+    firedShots += 1;
   }
+
+  return firedShots > 0;
 }
 
-function fireShot() {
+function fireShot(delta) {
   state.shots += 1;
 
   const recoilPoint = getRecoilPoint(state.recoilShotIndex);
@@ -863,6 +869,9 @@ function fireShot() {
     2
   );
   applyAimRecoil(recoilPoint);
+  updateCamera();
+  applyAimAssist(delta);
+  updateCamera();
 
   const shotDirection = getShotDirection(shotOffset);
   raycaster.set(getCameraOrigin(), shotDirection);
