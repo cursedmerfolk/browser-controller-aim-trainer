@@ -2,6 +2,7 @@ import './style.css';
 import * as THREE from 'three';
 
 const SETTINGS_STORAGE_KEY = 'browser-controller-aim-trainer.settings';
+const SETTINGS_STORAGE_VERSION = 2;
 
 const RESPONSE_CURVE_OPTIONS = [
   { value: 'linear', label: 'Linear' },
@@ -20,6 +21,21 @@ const TARGET_BODY_BASE_HEIGHT = 0.96;
 const TARGET_HEAD_RADIUS = 0.18;
 const LEGACY_TARGET_SPEED_MIN = 0.45;
 const LEGACY_TARGET_SPEED_MAX = 1.8;
+const LEGACY_SETTINGS_ORDER = [
+  'lookSensitivity',
+  'deadzone',
+  'fov',
+  'projectileRate',
+  'sphereSpeed',
+  'recoilYStrength',
+  'recoilVariance',
+  'recoilHorizontalOscillationStrength',
+  'recoilHorizontalOscillationSpeed',
+  'recoilIntensityOscillator',
+  'recoilIntensityOscillationSpeed',
+  'responseCurve',
+  'invertY'
+];
 
 const DEFAULT_SETTINGS = {
   lookSensitivity: 2.8,
@@ -130,8 +146,8 @@ app.innerHTML = `
     ${renderNumericControl({
       id: 'sensitivity',
       label: 'Sensitivity',
-      min: 0.5,
-      max: 6,
+      min: 1,
+      max: 10,
       step: 0.1,
       value: SETTINGS.lookSensitivity
     })}
@@ -396,8 +412,8 @@ hudElements.discoverControllerButton.addEventListener('click', () => {
 
 bindNumericSetting({
   id: 'sensitivity',
-  min: 0.5,
-  max: 6,
+  min: 1,
+  max: 10,
   fallback: DEFAULT_SETTINGS.lookSensitivity,
   onChange: (value) => {
     SETTINGS.lookSensitivity = value;
@@ -1195,56 +1211,57 @@ function loadStoredSettings() {
 
   try {
     const parsed = JSON.parse(storedValue);
-    const legacySphereSpeed = clampSetting(parsed.sphereSpeed, 0.4, 2.5, 1.35);
+    const storedSettings = getStoredSettingsMap(parsed);
+    const legacySphereSpeed = clampSetting(storedSettings.sphereSpeed, 0.4, 2.5, 1.35);
     const targetHorizontalSpeedMin =
-      typeof parsed.targetHorizontalSpeedMin === 'number'
-        ? parsed.targetHorizontalSpeedMin
+      typeof storedSettings.targetHorizontalSpeedMin === 'number'
+        ? storedSettings.targetHorizontalSpeedMin
         : LEGACY_TARGET_SPEED_MIN * legacySphereSpeed;
     const targetHorizontalSpeedMax =
-      typeof parsed.targetHorizontalSpeedMax === 'number'
-        ? parsed.targetHorizontalSpeedMax
+      typeof storedSettings.targetHorizontalSpeedMax === 'number'
+        ? storedSettings.targetHorizontalSpeedMax
         : LEGACY_TARGET_SPEED_MAX * legacySphereSpeed;
 
     return {
-      lookSensitivity: clampSetting(parsed.lookSensitivity, 0.5, 6, DEFAULT_SETTINGS.lookSensitivity),
-      deadzone: clampSetting(parsed.deadzone, 0, 0.35, DEFAULT_SETTINGS.deadzone),
-      fov: clampSetting(parsed.fov, 50, 110, DEFAULT_SETTINGS.fov),
-      projectileRate: clampSetting(parsed.projectileRate, 1, 15, DEFAULT_SETTINGS.projectileRate),
+      lookSensitivity: clampSetting(storedSettings.lookSensitivity, 1, 10, DEFAULT_SETTINGS.lookSensitivity),
+      deadzone: clampSetting(storedSettings.deadzone, 0, 0.35, DEFAULT_SETTINGS.deadzone),
+      fov: clampSetting(storedSettings.fov, 50, 110, DEFAULT_SETTINGS.fov),
+      projectileRate: clampSetting(storedSettings.projectileRate, 1, 15, DEFAULT_SETTINGS.projectileRate),
       recoilYStrength: clampSetting(
-        parsed.recoilYStrength ?? parsed.recoilPatternStrength ?? parsed.sprayPatternStrength,
+        storedSettings.recoilYStrength ?? storedSettings.recoilPatternStrength ?? storedSettings.sprayPatternStrength,
         0.05,
         2.5,
         DEFAULT_SETTINGS.recoilYStrength
       ),
-      recoilVariance: clampSetting(parsed.recoilVariance, 0, 10, DEFAULT_SETTINGS.recoilVariance),
+      recoilVariance: clampSetting(storedSettings.recoilVariance, 0, 10, DEFAULT_SETTINGS.recoilVariance),
       recoilHorizontalOscillationStrength: clampSetting(
-        parsed.recoilHorizontalOscillationStrength,
+        storedSettings.recoilHorizontalOscillationStrength,
         0,
         5,
         DEFAULT_SETTINGS.recoilHorizontalOscillationStrength
       ),
       recoilHorizontalOscillationSpeed: clampSetting(
-        parsed.recoilHorizontalOscillationSpeed,
+        storedSettings.recoilHorizontalOscillationSpeed,
         0.1,
         3,
         DEFAULT_SETTINGS.recoilHorizontalOscillationSpeed
       ),
       recoilIntensityOscillator: clampSetting(
-        parsed.recoilIntensityOscillator,
+        storedSettings.recoilIntensityOscillator,
         0,
         1.5,
         DEFAULT_SETTINGS.recoilIntensityOscillator
       ),
       recoilIntensityOscillationSpeed: clampSetting(
-        parsed.recoilIntensityOscillationSpeed,
+        storedSettings.recoilIntensityOscillationSpeed,
         0.1,
         2,
         DEFAULT_SETTINGS.recoilIntensityOscillationSpeed
       ),
       targetHorizontalSpeedMin: clampSetting(targetHorizontalSpeedMin, 0.1, 5, DEFAULT_SETTINGS.targetHorizontalSpeedMin),
       targetHorizontalSpeedMax: clampSetting(targetHorizontalSpeedMax, 0.1, 5, DEFAULT_SETTINGS.targetHorizontalSpeedMax),
-      responseCurve: sanitizeResponseCurve(parsed.responseCurve),
-      invertY: typeof parsed.invertY === 'boolean' ? parsed.invertY : DEFAULT_SETTINGS.invertY
+      responseCurve: sanitizeResponseCurve(storedSettings.responseCurve),
+      invertY: typeof storedSettings.invertY === 'boolean' ? storedSettings.invertY : DEFAULT_SETTINGS.invertY
     };
   } catch (error) {
     console.error('Failed to parse stored controller settings.', error);
@@ -1256,22 +1273,47 @@ function storeSettings() {
   window.localStorage.setItem(
     SETTINGS_STORAGE_KEY,
     JSON.stringify({
-      lookSensitivity: SETTINGS.lookSensitivity,
-      deadzone: SETTINGS.deadzone,
-      fov: SETTINGS.fov,
-      projectileRate: SETTINGS.projectileRate,
-      recoilYStrength: SETTINGS.recoilYStrength,
-      recoilVariance: SETTINGS.recoilVariance,
-      recoilHorizontalOscillationStrength: SETTINGS.recoilHorizontalOscillationStrength,
-      recoilHorizontalOscillationSpeed: SETTINGS.recoilHorizontalOscillationSpeed,
-      recoilIntensityOscillator: SETTINGS.recoilIntensityOscillator,
-      recoilIntensityOscillationSpeed: SETTINGS.recoilIntensityOscillationSpeed,
-      targetHorizontalSpeedMin: SETTINGS.targetHorizontalSpeedMin,
-      targetHorizontalSpeedMax: SETTINGS.targetHorizontalSpeedMax,
-      responseCurve: SETTINGS.responseCurve,
-      invertY: SETTINGS.invertY
+      version: SETTINGS_STORAGE_VERSION,
+      values: {
+        lookSensitivity: SETTINGS.lookSensitivity,
+        deadzone: SETTINGS.deadzone,
+        fov: SETTINGS.fov,
+        projectileRate: SETTINGS.projectileRate,
+        recoilYStrength: SETTINGS.recoilYStrength,
+        recoilVariance: SETTINGS.recoilVariance,
+        recoilHorizontalOscillationStrength: SETTINGS.recoilHorizontalOscillationStrength,
+        recoilHorizontalOscillationSpeed: SETTINGS.recoilHorizontalOscillationSpeed,
+        recoilIntensityOscillator: SETTINGS.recoilIntensityOscillator,
+        recoilIntensityOscillationSpeed: SETTINGS.recoilIntensityOscillationSpeed,
+        targetHorizontalSpeedMin: SETTINGS.targetHorizontalSpeedMin,
+        targetHorizontalSpeedMax: SETTINGS.targetHorizontalSpeedMax,
+        responseCurve: SETTINGS.responseCurve,
+        invertY: SETTINGS.invertY
+      }
     })
   );
+}
+
+function getStoredSettingsMap(parsed) {
+  if (Array.isArray(parsed)) {
+    return LEGACY_SETTINGS_ORDER.reduce((settingsMap, key, index) => {
+      if (index < parsed.length) {
+        settingsMap[key] = parsed[index];
+      }
+
+      return settingsMap;
+    }, {});
+  }
+
+  if (parsed && typeof parsed === 'object' && parsed.values && typeof parsed.values === 'object' && !Array.isArray(parsed.values)) {
+    return parsed.values;
+  }
+
+  if (parsed && typeof parsed === 'object') {
+    return parsed;
+  }
+
+  return {};
 }
 
 function clampSetting(value, min, max, fallback) {
