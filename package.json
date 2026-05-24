@@ -1,0 +1,22 @@
+{
+  "name": "browser-controller-aim-trainer",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite --host 0.0.0.0",
+    "build": "vite build",
+    "preview": "vite preview --host 0.0.0.0",
+    "lint": "eslint src --ext .js"
+  },
+  "dependencies": {
+    "@vitejs/plugin-basic-ssl": "latest",
+    "three": "latest",
+    "vite": "latest"
+  },
+  "devDependencies": {
+    "@eslint/js": "latest",
+    "eslint": "latest",
+    "globals": "latest"
+  }
+}
