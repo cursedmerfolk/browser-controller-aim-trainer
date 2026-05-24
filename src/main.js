@@ -33,7 +33,7 @@ const DEFAULT_SETTINGS = {
   sphereSpeed: 1.35,
   targetCount: 8,
   targetRadius: 0.45,
-  targetMaxHealth: 4,
+  targetMaxHealth: 12,
   spawnDistanceMin: 9,
   spawnDistanceMax: 16,
   targetLifetimeMin: 6,
@@ -721,6 +721,8 @@ function createTarget() {
   target.userData.horizontalVelocity = new THREE.Vector3();
   target.userData.age = 0;
   target.userData.lifetime = SETTINGS.targetLifetimeMax;
+  target.userData.widthScale = 0.5;
+  target.userData.heightScale = 2.1;
 
   return target;
 }
@@ -756,9 +758,15 @@ function respawnTarget(target) {
   target.userData.lifetime = randomRange(SETTINGS.targetLifetimeMin, SETTINGS.targetLifetimeMax);
   target.userData.health = target.userData.maxHealth;
   target.userData.rotationSpeed = randomRange(0.8, 1.6);
+  target.userData.widthScale = randomRange(0.38, 0.52);
+  target.userData.heightScale = randomRange(1.9, 2.6);
 
   target.position.copy(worldPosition);
-  target.scale.setScalar(randomRange(0.85, 1.2));
+  target.scale.set(
+    target.userData.widthScale,
+    target.userData.heightScale,
+    target.userData.widthScale
+  );
 
   applyTargetHealthVisuals(target);
 }
@@ -812,30 +820,29 @@ function createWeaponModel() {
   const darkMaterial = new THREE.MeshStandardMaterial({ color: 0x111722, roughness: 0.8, metalness: 0.15 });
   const accentMaterial = new THREE.MeshStandardMaterial({ color: 0x2f3f57, roughness: 0.55, metalness: 0.2 });
 
-  const receiver = new THREE.Mesh(new THREE.BoxGeometry(0.18, 0.12, 0.52), darkMaterial);
-  receiver.position.set(0, -0.02, -0.24);
+  const receiver = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.1, 0.34), darkMaterial);
+  receiver.position.set(0, -0.02, -0.27);
   rifle.add(receiver);
 
-  const stock = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.12, 0.2), accentMaterial);
-  stock.position.set(-0.01, -0.02, 0.08);
+  const stock = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.1, 0.2), accentMaterial);
+  stock.position.set(0, -0.02, 0);
   rifle.add(stock);
 
-  const handguard = new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.1, 0.26), accentMaterial);
-  handguard.position.set(0.01, -0.015, -0.62);
+  const handguard = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.08, 0.28), accentMaterial);
+  handguard.position.set(0, -0.02, -0.58);
   rifle.add(handguard);
 
-  const barrel = new THREE.Mesh(new THREE.CylinderGeometry(0.018, 0.018, 0.52, 12), darkMaterial);
+  const barrel = new THREE.Mesh(new THREE.CylinderGeometry(0.018, 0.018, 0.56, 12), darkMaterial);
   barrel.rotation.x = Math.PI / 2;
-  barrel.position.set(0.01, -0.01, -0.86);
+  barrel.position.set(0, -0.02, -1);
   rifle.add(barrel);
 
-  const sight = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.04, 0.16), accentMaterial);
-  sight.position.set(0.01, 0.08, -0.3);
+  const sight = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.035, 0.16), accentMaterial);
+  sight.position.set(0, 0.0475, -0.27);
   rifle.add(sight);
 
-  const grip = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.18, 0.08), darkMaterial);
-  grip.position.set(0.03, -0.14, -0.1);
-  grip.rotation.x = -0.25;
+  const grip = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.16, 0.07), darkMaterial);
+  grip.position.set(0, -0.15, -0.16);
   rifle.add(grip);
 
   return rifle;
@@ -843,15 +850,15 @@ function createWeaponModel() {
 
 function updateWeaponTransform() {
   weapon.position.set(
-    THREE.MathUtils.lerp(0.34, 0.02, state.aimBlend) + state.recoilPatternX * 0.01,
-    THREE.MathUtils.lerp(-0.28, -0.2, state.aimBlend) - state.weaponKick * 0.025 - state.recoilPatternY * 0.008,
-    THREE.MathUtils.lerp(-0.6, -0.43, state.aimBlend) + state.weaponKick * 0.05
+    THREE.MathUtils.lerp(0.34, 0, state.aimBlend) + state.recoilPatternX * 0.01 * (1 - state.aimBlend * 0.85),
+    THREE.MathUtils.lerp(-0.28, -0.08, state.aimBlend) - state.weaponKick * 0.025 - state.recoilPatternY * 0.008,
+    THREE.MathUtils.lerp(-0.6, -0.34, state.aimBlend) + state.weaponKick * 0.05
   );
 
   weapon.rotation.set(
-    THREE.MathUtils.lerp(-0.18, -0.04, state.aimBlend) + state.weaponKick * 0.14 + state.recoilPatternY * 0.06,
-    THREE.MathUtils.lerp(-0.34, -0.02, state.aimBlend),
-    THREE.MathUtils.lerp(-0.08, -0.02, state.aimBlend) - state.recoilPatternX * 0.09
+    THREE.MathUtils.lerp(-0.18, 0, state.aimBlend) + state.weaponKick * 0.14 + state.recoilPatternY * 0.06,
+    THREE.MathUtils.lerp(-0.34, 0, state.aimBlend),
+    THREE.MathUtils.lerp(-0.08, 0, state.aimBlend) - state.recoilPatternX * 0.09 * (1 - state.aimBlend * 0.85)
   );
 }
 
