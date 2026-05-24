@@ -23,13 +23,12 @@ const PROJECTILE_UP_AXIS = new THREE.Vector3(0, 1, 0);
 const WORLD_UP_AXIS = new THREE.Vector3(0, 1, 0);
 const TARGET_BODY_BASE_HEIGHT = 0.96;
 const TARGET_HEAD_RADIUS = 0.18;
-const TARGET_DEPTH_SCALE = 0.45;
 
 const DEFAULT_SETTINGS = {
   lookSensitivity: 2.8,
   deadzone: 0.12,
   invertY: false,
-  fov: 75,
+  fov: 110,
   responseCurve: 'linear',
   projectileRate: 14,
   recoilPatternShape: 'vertical',
@@ -38,7 +37,7 @@ const DEFAULT_SETTINGS = {
   targetCount: 8,
   targetRadius: 0.45,
   targetMaxHealth: 12,
-  spawnDistanceMin: 14,
+  spawnDistanceMin: 10,
   spawnDistanceMax: 28,
   targetLifetimeMin: 6,
   targetLifetimeMax: 9,
@@ -220,7 +219,7 @@ scene.background = new THREE.Color(0x0b1020);
 scene.fog = new THREE.Fog(0x0b1020, 36, 110);
 
 const camera = new THREE.PerspectiveCamera(SETTINGS.fov, window.innerWidth / window.innerHeight, 0.1, 100);
-camera.position.set(0, 1.7, 0);
+camera.position.set(0, 2.2, 0);
 scene.add(camera);
 
 const ambientLight = new THREE.HemisphereLight(0xffffff, 0x223355, 1.5);
@@ -253,7 +252,7 @@ camera.add(weapon);
 
 const targets = [];
 const projectiles = [];
-const targetBodyGeometry = new THREE.BoxGeometry(0.36, TARGET_BODY_BASE_HEIGHT, 0.16);
+const targetBodyGeometry = new THREE.BoxGeometry(0.36, TARGET_BODY_BASE_HEIGHT, 0.36);
 const targetHeadGeometry = new THREE.SphereGeometry(TARGET_HEAD_RADIUS, 24, 24);
 const projectileGeometry = new THREE.CylinderGeometry(0.025, 0.025, 1, 10);
 const projectileMaterial = new THREE.MeshStandardMaterial({
@@ -615,7 +614,7 @@ function getMissPoint() {
 }
 
 function getProjectileStart() {
-  return weapon.localToWorld(new THREE.Vector3(0.01, -0.01, -1.12));
+  return weapon.localToWorld(weapon.userData.barrelTipLocal.clone());
 }
 
 function getShotOffset(sprayPoint) {
@@ -780,6 +779,12 @@ function respawnTarget(target) {
     .clone()
     .addScaledVector(horizontalForward, distance)
     .addScaledVector(horizontalRight, lateralOffset);
+  if (Math.random() < 0.35) {
+    worldPosition.y = target.userData.feetClearance;
+  } else {
+    worldPosition.y = randomRange(target.userData.feetClearance, 0.7);
+  }
+
   const horizontalVelocity = getHorizontalVelocity();
 
   target.userData.basePosition.copy(worldPosition);
@@ -787,7 +792,6 @@ function respawnTarget(target) {
   target.userData.age = 0;
   target.userData.lifetime = randomRange(SETTINGS.targetLifetimeMin, SETTINGS.targetLifetimeMax);
   target.userData.health = target.userData.maxHealth;
-  target.userData.rotationSpeed = randomRange(0.8, 1.6);
   target.userData.widthScale = randomRange(0.92, 1.12);
   target.userData.bodyHeightScale = randomRange(1.2, 1.55);
   target.userData.totalHeight =
@@ -796,14 +800,13 @@ function respawnTarget(target) {
   target.userData.body.scale.set(
     target.userData.widthScale,
     target.userData.bodyHeightScale,
-    target.userData.widthScale * TARGET_DEPTH_SCALE
+    target.userData.widthScale
   );
   target.userData.body.position.y = (TARGET_BODY_BASE_HEIGHT * target.userData.bodyHeightScale) / 2;
   target.userData.head.scale.setScalar(target.userData.widthScale);
   target.userData.head.position.y =
     TARGET_BODY_BASE_HEIGHT * target.userData.bodyHeightScale + TARGET_HEAD_RADIUS * target.userData.widthScale;
 
-  worldPosition.y = randomRange(target.userData.feetClearance, 0.85);
   target.position.copy(worldPosition);
 
   applyTargetHealthVisuals(target);
@@ -845,7 +848,6 @@ function updateTargets(delta) {
     target.userData.basePosition.addScaledVector(target.userData.horizontalVelocity, delta);
     target.userData.basePosition.y = Math.max(target.userData.basePosition.y, target.userData.feetClearance);
     target.position.copy(target.userData.basePosition);
-    target.rotation.y += delta * target.userData.rotationSpeed;
 
     if (target.userData.age >= target.userData.lifetime) {
       respawnTarget(target);
@@ -875,6 +877,7 @@ function createWeaponModel() {
   barrel.rotation.x = Math.PI / 2;
   barrel.position.set(0, -0.02, -1);
   rifle.add(barrel);
+  rifle.userData.barrelTipLocal = new THREE.Vector3(0, -0.02, -1.34);
 
   const sight = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.035, 0.16), accentMaterial);
   sight.position.set(0, 0.0475, -0.27);
@@ -890,8 +893,8 @@ function createWeaponModel() {
 function updateWeaponTransform() {
   weapon.position.set(
     THREE.MathUtils.lerp(0.24, 0, state.aimBlend) + state.recoilPatternX * 0.01 * (1 - state.aimBlend * 0.85),
-    THREE.MathUtils.lerp(-0.2, -0.08, state.aimBlend) - state.weaponKick * 0.025 - state.recoilPatternY * 0.008,
-    THREE.MathUtils.lerp(-0.46, -0.34, state.aimBlend) + state.weaponKick * 0.05
+    THREE.MathUtils.lerp(-0.2, -0.1, state.aimBlend) - state.weaponKick * 0.025 - state.recoilPatternY * 0.008,
+    THREE.MathUtils.lerp(-0.24, -0.17, state.aimBlend) + state.weaponKick * 0.05
   );
 
   weapon.rotation.set(
