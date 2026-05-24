@@ -9,12 +9,6 @@ const RESPONSE_CURVE_OPTIONS = [
   { value: 'inverse-s', label: 'Inverse S' }
 ];
 
-const RECOIL_PATTERN_OPTIONS = [
-  { value: 'vertical', label: 'Vertical' },
-  { value: 'zigzag', label: 'Zigzag' },
-  { value: 'spiral', label: 'Spiral' }
-];
-
 const FULL_HEALTH_COLOR = new THREE.Color(0x2fd66b);
 const LOW_HEALTH_COLOR = new THREE.Color(0xff4d6d);
 const FULL_HEALTH_EMISSIVE = new THREE.Color(0x07150d);
@@ -31,8 +25,10 @@ const DEFAULT_SETTINGS = {
   fov: 110,
   responseCurve: 'linear',
   projectileRate: 14,
-  recoilPatternShape: 'vertical',
-  recoilPatternStrength: 0.45,
+  recoilYStrength: 0.6,
+  recoilVariance: 0.18,
+  recoilHorizontalOscillationStrength: 0.3,
+  recoilIntensityOscillator: 0.35,
   sphereSpeed: 1.35,
   targetCount: 8,
   targetRadius: 0.45,
@@ -75,32 +71,36 @@ const state = {
   spreadKick: 0,
   weaponKick: 0,
   fireCooldown: 0,
-  sprayShotIndex: 0,
+  recoilShotIndex: 0,
   recoilPatternX: 0,
   recoilPatternY: 0
 };
 
 const app = document.querySelector('#app');
 app.innerHTML = `
-  <div class="hud-panel hud edge-panel" id="hud-panel" data-side="left">
+  <div class="hud-panel hud edge-panel is-collapsed" id="hud-panel" data-side="left">
     <button
       class="panel-toggle"
       id="hud-panel-toggle"
       type="button"
-      aria-expanded="true"
+      aria-expanded="false"
       aria-label="Collapse Controller Aim Trainer panel"
     >
-      <span aria-hidden="true">˅</span>
+      <span aria-hidden="true">˄</span>
     </button>
-    <strong>Controller Aim Trainer</strong>
-    <div id="gamepad-status">Controller: ${state.gamepadName}</div>
-    <div id="mode-status">Aim mode: HIP FIRE</div>
-    <div id="curve-status">Curve: ${getResponseCurveLabel(SETTINGS.responseCurve)}</div>
-    <div id="recoil-status">Recoil pattern: ${getRecoilPatternLabel(SETTINGS.recoilPatternShape)}</div>
-    <div id="score">Score: 0</div>
-    <div id="accuracy">Accuracy: 0%</div>
-    <div id="shots">Shots: 0 | Hits: 0</div>
-    <div id="raw-stick">Raw stick: X 0.00 | Y 0.00</div>
+    <div class="panel-header">
+      <strong>Controller Aim Trainer</strong>
+    </div>
+    <div class="panel-content">
+      <div id="gamepad-status">Controller: ${state.gamepadName}</div>
+      <div id="mode-status">Aim mode: HIP FIRE</div>
+      <div id="curve-status">Curve: ${getResponseCurveLabel(SETTINGS.responseCurve)}</div>
+      <div id="recoil-status">Recoil: Y ${SETTINGS.recoilYStrength.toFixed(2)} | Var ${SETTINGS.recoilVariance.toFixed(2)} | Osc ${SETTINGS.recoilHorizontalOscillationStrength.toFixed(2)} | Int ${SETTINGS.recoilIntensityOscillator.toFixed(2)}</div>
+      <div id="score">Score: 0</div>
+      <div id="accuracy">Accuracy: 0%</div>
+      <div id="shots">Shots: 0 | Hits: 0</div>
+      <div id="raw-stick">Raw stick: X 0.00 | Y 0.00</div>
+    </div>
   </div>
   <div class="crosshair" id="crosshair" aria-hidden="true">
     <span class="crosshair-dot"></span>
@@ -109,17 +109,20 @@ app.innerHTML = `
     <span class="crosshair-tick crosshair-tick-bottom"></span>
     <span class="crosshair-tick crosshair-tick-left"></span>
   </div>
-  <div class="hud-panel settings-panel edge-panel" id="settings-panel" data-side="right">
+  <div class="hud-panel settings-panel edge-panel is-collapsed" id="settings-panel" data-side="right">
     <button
       class="panel-toggle"
       id="settings-panel-toggle"
       type="button"
-      aria-expanded="true"
+      aria-expanded="false"
       aria-label="Collapse Controller settings panel"
     >
-      <span aria-hidden="true">˅</span>
+      <span aria-hidden="true">˄</span>
     </button>
-    <strong>Controller settings</strong>
+    <div class="panel-header">
+      <strong>Controller settings</strong>
+    </div>
+    <div class="panel-content">
     ${renderNumericControl({
       id: 'sensitivity',
       label: 'Sensitivity',
@@ -161,12 +164,36 @@ app.innerHTML = `
       value: SETTINGS.sphereSpeed
     })}
     ${renderNumericControl({
-      id: 'recoil-strength',
-      label: 'Recoil strength',
+      id: 'recoil-y-strength',
+      label: 'Recoil Y strength',
       min: 0.05,
-      max: 1.2,
+      max: 2.5,
       step: 0.05,
-      value: SETTINGS.recoilPatternStrength
+      value: SETTINGS.recoilYStrength
+    })}
+    ${renderNumericControl({
+      id: 'recoil-variance',
+      label: 'Recoil variance',
+      min: 0,
+      max: 1,
+      step: 0.05,
+      value: SETTINGS.recoilVariance
+    })}
+    ${renderNumericControl({
+      id: 'recoil-horizontal-oscillation',
+      label: 'Recoil horiz. oscillation',
+      min: 0,
+      max: 5,
+      step: 0.05,
+      value: SETTINGS.recoilHorizontalOscillationStrength
+    })}
+    ${renderNumericControl({
+      id: 'recoil-intensity-oscillator',
+      label: 'Recoil intensity oscillator',
+      min: 0,
+      max: 1.5,
+      step: 0.05,
+      value: SETTINGS.recoilIntensityOscillator
     })}
     <label class="control-group" for="response-curve-input">
       <span>Response curve</span>
@@ -174,36 +201,35 @@ app.innerHTML = `
         ${renderOptions(RESPONSE_CURVE_OPTIONS, SETTINGS.responseCurve)}
       </select>
     </label>
-    <label class="control-group" for="recoil-pattern-input">
-      <span>Recoil pattern</span>
-      <select id="recoil-pattern-input">
-        ${renderOptions(RECOIL_PATTERN_OPTIONS, SETTINGS.recoilPatternShape)}
-      </select>
-    </label>
     <label class="checkbox-row" for="invert-y-input">
       <input id="invert-y-input" type="checkbox" ${SETTINGS.invertY ? 'checked' : ''} />
       <span>Invert Y</span>
     </label>
+    </div>
   </div>
-  <div class="hud-panel instructions edge-panel" id="controls-panel" data-side="left">
+  <div class="hud-panel instructions edge-panel is-collapsed" id="controls-panel" data-side="left">
     <button
       class="panel-toggle"
       id="controls-panel-toggle"
       type="button"
-      aria-expanded="true"
+      aria-expanded="false"
       aria-label="Collapse Controls panel"
     >
-      <span aria-hidden="true">˅</span>
+      <span aria-hidden="true">˄</span>
     </button>
-    <div><strong>Controls</strong></div>
-    <div>Right stick: aim</div>
-    <div>Left trigger / L2: aim down sights</div>
-    <div>Right trigger / R2: fire continuously</div>
-    <div>Keyboard fallback: arrow keys/WASD aim, Shift ADS, Space fire</div>
-    <div>Targets spawn on screen, drift sideways, and despawn after a short time.</div>
-    <div class="button-row">
-      <button id="discover-controller-button" type="button">Discover controller</button>
-      <button id="reset-button" type="button">Reset run</button>
+    <div class="panel-header">
+      <strong>Controls</strong>
+    </div>
+    <div class="panel-content">
+      <div>Right stick: aim</div>
+      <div>Left trigger / L2: aim down sights</div>
+      <div>Right trigger / R2: fire continuously</div>
+      <div>Keyboard fallback: arrow keys/WASD aim, Shift ADS, Space fire</div>
+      <div>Targets spawn on screen, drift sideways, and despawn after a short time.</div>
+      <div class="button-row">
+        <button id="discover-controller-button" type="button">Discover controller</button>
+        <button id="reset-button" type="button">Reset run</button>
+      </div>
     </div>
   </div>
 `;
@@ -286,7 +312,6 @@ const hudElements = {
   settingsPanel: document.querySelector('#settings-panel'),
   controlsPanel: document.querySelector('#controls-panel'),
   responseCurveInput: document.querySelector('#response-curve-input'),
-  recoilPatternInput: document.querySelector('#recoil-pattern-input'),
   invertYInput: document.querySelector('#invert-y-input'),
   discoverControllerButton: document.querySelector('#discover-controller-button')
 };
@@ -321,7 +346,6 @@ window.addEventListener('resize', () => {
   camera.aspect = window.innerWidth / window.innerHeight;
   camera.updateProjectionMatrix();
   renderer.setSize(window.innerWidth, window.innerHeight);
-  updatePanelCollapseDistances();
 });
 
 document.querySelector('#reset-button').addEventListener('click', () => {
@@ -331,7 +355,7 @@ document.querySelector('#reset-button').addEventListener('click', () => {
   state.spreadKick = 0;
   state.weaponKick = 0;
   state.fireCooldown = 0;
-  state.sprayShotIndex = 0;
+  state.recoilShotIndex = 0;
   state.recoilPatternX = 0;
   state.recoilPatternY = 0;
   resetTargets();
@@ -393,22 +417,47 @@ bindNumericSetting({
 });
 
 bindNumericSetting({
-  id: 'recoil-strength',
+  id: 'recoil-y-strength',
   min: 0.05,
-  max: 1.2,
-  fallback: DEFAULT_SETTINGS.recoilPatternStrength,
+  max: 2.5,
+  fallback: DEFAULT_SETTINGS.recoilYStrength,
   onChange: (value) => {
-    SETTINGS.recoilPatternStrength = value;
+    SETTINGS.recoilYStrength = value;
+  }
+});
+
+bindNumericSetting({
+  id: 'recoil-variance',
+  min: 0,
+  max: 1,
+  fallback: DEFAULT_SETTINGS.recoilVariance,
+  onChange: (value) => {
+    SETTINGS.recoilVariance = value;
+  }
+});
+
+bindNumericSetting({
+  id: 'recoil-horizontal-oscillation',
+  min: 0,
+  max: 5,
+  fallback: DEFAULT_SETTINGS.recoilHorizontalOscillationStrength,
+  onChange: (value) => {
+    SETTINGS.recoilHorizontalOscillationStrength = value;
+  }
+});
+
+bindNumericSetting({
+  id: 'recoil-intensity-oscillator',
+  min: 0,
+  max: 1.5,
+  fallback: DEFAULT_SETTINGS.recoilIntensityOscillator,
+  onChange: (value) => {
+    SETTINGS.recoilIntensityOscillator = value;
   }
 });
 
 hudElements.responseCurveInput.addEventListener('change', (event) => {
   SETTINGS.responseCurve = sanitizeResponseCurve(event.target.value);
-  storeSettings();
-});
-
-hudElements.recoilPatternInput.addEventListener('change', (event) => {
-  SETTINGS.recoilPatternShape = sanitizeRecoilPattern(event.target.value);
   storeSettings();
 });
 
@@ -540,7 +589,7 @@ function updateAimState(delta, adsPressed, shootPressed) {
   state.recoilPatternY = THREE.MathUtils.lerp(state.recoilPatternY, 0, 1 - Math.exp(-delta * 8));
 
   if (!shootPressed) {
-    state.sprayShotIndex = 0;
+    state.recoilShotIndex = 0;
   }
 }
 
@@ -581,23 +630,23 @@ function updateFiring(delta, shootPressed) {
 function fireShot() {
   state.shots += 1;
 
-  const sprayPoint = getRecoilPatternPoint(state.sprayShotIndex);
-  const shotOffset = getShotOffset(sprayPoint.clone());
-  state.sprayShotIndex += 1;
+  const recoilPoint = getRecoilPoint(state.recoilShotIndex);
+  const shotOffset = getShotOffset(recoilPoint.clone());
+  state.recoilShotIndex += 1;
 
   state.spreadKick = Math.min(state.spreadKick + (state.isAimingDownSights ? 0.35 : 1), 3);
   state.weaponKick = Math.min(state.weaponKick + (state.isAimingDownSights ? 0.35 : 0.7), 1.2);
   state.recoilPatternX = THREE.MathUtils.clamp(
-    state.recoilPatternX + sprayPoint.x * SETTINGS.recoilPatternStrength * 0.08,
+    state.recoilPatternX + recoilPoint.x * 0.12,
     -1.5,
     1.5
   );
   state.recoilPatternY = THREE.MathUtils.clamp(
-    state.recoilPatternY + sprayPoint.y * SETTINGS.recoilPatternStrength * 0.06,
+    state.recoilPatternY + recoilPoint.y * 0.08,
     0,
     2
   );
-  applyAimRecoil(sprayPoint);
+  applyAimRecoil(recoilPoint);
 
   raycaster.setFromCamera(shotOffset, camera);
   const intersections = raycaster.intersectObjects(targets, true);
@@ -619,18 +668,18 @@ function getProjectileStart() {
 }
 
 function applyAimRecoil(recoilPoint) {
-  const horizontalKick = recoilPoint.x * SETTINGS.recoilPatternStrength * THREE.MathUtils.lerp(0.009, 0.0055, state.aimBlend);
-  const verticalKick = recoilPoint.y * SETTINGS.recoilPatternStrength * THREE.MathUtils.lerp(0.013, 0.0085, state.aimBlend);
+  const horizontalKick = recoilPoint.x * THREE.MathUtils.lerp(0.013, 0.008, state.aimBlend);
+  const verticalKick = recoilPoint.y * THREE.MathUtils.lerp(0.02, 0.013, state.aimBlend);
 
   state.yaw -= horizontalKick;
   state.pitch = THREE.MathUtils.clamp(state.pitch + verticalKick, -0.85, 0.85);
 }
 
-function getShotOffset(sprayPoint) {
+function getShotOffset(recoilPoint) {
   const randomOffset = getRandomSpreadOffset();
-  const patternScale = SETTINGS.recoilPatternStrength * THREE.MathUtils.lerp(0.0028, 0.0012, state.aimBlend);
+  const recoilScale = THREE.MathUtils.lerp(0.0042, 0.0019, state.aimBlend);
 
-  return randomOffset.add(sprayPoint.multiplyScalar(patternScale));
+  return randomOffset.add(recoilPoint.multiplyScalar(recoilScale));
 }
 
 function getRandomSpreadOffset() {
@@ -651,24 +700,19 @@ function getCurrentSpreadPx() {
   return baseSpread + state.spreadKick * SETTINGS.shotSpreadKickPx;
 }
 
-function getRecoilPatternPoint(shotIndex) {
+function getRecoilPoint(shotIndex) {
   const step = shotIndex + 1;
+  const intensityOscillation = Math.sin(step * 0.37) * SETTINGS.recoilIntensityOscillator;
+  const oscillationRate = 0.82 + intensityOscillation * 0.55;
+  const intensityScale = Math.max(0.15, 1 + intensityOscillation * 0.7);
+  const expectedX = Math.sin(step * oscillationRate) * SETTINGS.recoilHorizontalOscillationStrength * intensityScale;
+  const varianceX = randomRange(-SETTINGS.recoilVariance, SETTINGS.recoilVariance);
+  const varianceY = randomRange(-SETTINGS.recoilVariance, SETTINGS.recoilVariance);
 
-  switch (SETTINGS.recoilPatternShape) {
-    case 'zigzag':
-      return new THREE.Vector2(
-        (step % 2 === 0 ? -1 : 1) * Math.min(0.3 + step * 0.08, 1.4),
-        0.35 + step * 0.16
-      );
-    case 'spiral': {
-      const radius = Math.min(0.25 + step * 0.07, 1.35);
-      const angle = step * 0.8;
-      return new THREE.Vector2(Math.cos(angle) * radius, 0.25 + step * 0.12 + Math.sin(angle) * radius * 0.25);
-    }
-    case 'vertical':
-    default:
-      return new THREE.Vector2(Math.sin(step * 0.4) * Math.min(0.18 + step * 0.03, 0.55), 0.3 + step * 0.16);
-  }
+  return new THREE.Vector2(
+    expectedX + varianceX,
+    Math.max(0, SETTINGS.recoilYStrength * intensityScale + varianceY)
+  );
 }
 
 function createProjectileVisual(start, end) {
@@ -924,7 +968,7 @@ function updateHud() {
   hudElements.gamepadStatus.textContent = `Controller: ${state.gamepadName}`;
   hudElements.modeStatus.textContent = `Aim mode: ${state.isAimingDownSights ? 'ADS' : 'HIP FIRE'}`;
   hudElements.curveStatus.textContent = `Curve: ${getResponseCurveLabel(SETTINGS.responseCurve)}`;
-  hudElements.recoilStatus.textContent = `Recoil pattern: ${getRecoilPatternLabel(SETTINGS.recoilPatternShape)}`;
+  hudElements.recoilStatus.textContent = `Recoil: Y ${SETTINGS.recoilYStrength.toFixed(2)} | Var ${SETTINGS.recoilVariance.toFixed(2)} | Osc ${SETTINGS.recoilHorizontalOscillationStrength.toFixed(2)} | Int ${SETTINGS.recoilIntensityOscillator.toFixed(2)}`;
   hudElements.score.textContent = `Score: ${state.score}`;
   hudElements.accuracy.textContent = `Accuracy: ${accuracy}%`;
   hudElements.shots.textContent = `Shots: ${state.shots} | Hits: ${state.hits}`;
@@ -965,21 +1009,7 @@ function initializePanelToggles() {
       const collapsed = panel.classList.toggle('is-collapsed');
       toggle.setAttribute('aria-expanded', String(!collapsed));
       toggle.querySelector('span').textContent = getPanelToggleSymbol(collapsed);
-      updatePanelCollapseDistances();
     });
-  }
-
-  updatePanelCollapseDistances();
-}
-
-function updatePanelCollapseDistances() {
-  const panels = [hudElements.hudPanel, hudElements.settingsPanel, hudElements.controlsPanel];
-  const visibleTabHeight = 46;
-
-  for (const panel of panels) {
-    const panelRect = panel.getBoundingClientRect();
-    const collapseDistance = Math.max(0, window.innerHeight - visibleTabHeight - panelRect.top);
-    panel.style.setProperty('--collapse-distance', `${collapseDistance}px`);
   }
 }
 
@@ -1040,16 +1070,8 @@ function getResponseCurveLabel(value) {
   return RESPONSE_CURVE_OPTIONS.find((option) => option.value === value)?.label ?? 'Linear';
 }
 
-function getRecoilPatternLabel(value) {
-  return RECOIL_PATTERN_OPTIONS.find((option) => option.value === value)?.label ?? 'Vertical';
-}
-
 function sanitizeResponseCurve(value) {
   return RESPONSE_CURVE_OPTIONS.some((option) => option.value === value) ? value : DEFAULT_SETTINGS.responseCurve;
-}
-
-function sanitizeRecoilPattern(value) {
-  return RECOIL_PATTERN_OPTIONS.some((option) => option.value === value) ? value : DEFAULT_SETTINGS.recoilPatternShape;
 }
 
 function loadStoredSettings() {
@@ -1066,15 +1088,27 @@ function loadStoredSettings() {
       deadzone: clampSetting(parsed.deadzone, 0, 0.35, DEFAULT_SETTINGS.deadzone),
       fov: clampSetting(parsed.fov, 50, 110, DEFAULT_SETTINGS.fov),
       projectileRate: clampSetting(parsed.projectileRate, 1, 15, DEFAULT_SETTINGS.projectileRate),
-      recoilPatternStrength: clampSetting(
-        parsed.recoilPatternStrength ?? parsed.sprayPatternStrength,
+      recoilYStrength: clampSetting(
+        parsed.recoilYStrength ?? parsed.recoilPatternStrength ?? parsed.sprayPatternStrength,
         0.05,
-        1.2,
-        DEFAULT_SETTINGS.recoilPatternStrength
+        2.5,
+        DEFAULT_SETTINGS.recoilYStrength
+      ),
+      recoilVariance: clampSetting(parsed.recoilVariance, 0, 1, DEFAULT_SETTINGS.recoilVariance),
+      recoilHorizontalOscillationStrength: clampSetting(
+        parsed.recoilHorizontalOscillationStrength,
+        0,
+        5,
+        DEFAULT_SETTINGS.recoilHorizontalOscillationStrength
+      ),
+      recoilIntensityOscillator: clampSetting(
+        parsed.recoilIntensityOscillator,
+        0,
+        1.5,
+        DEFAULT_SETTINGS.recoilIntensityOscillator
       ),
       sphereSpeed: clampSetting(parsed.sphereSpeed, 0.4, 2.5, DEFAULT_SETTINGS.sphereSpeed),
       responseCurve: sanitizeResponseCurve(parsed.responseCurve),
-      recoilPatternShape: sanitizeRecoilPattern(parsed.recoilPatternShape ?? parsed.sprayPatternShape),
       invertY: typeof parsed.invertY === 'boolean' ? parsed.invertY : DEFAULT_SETTINGS.invertY
     };
   } catch (error) {
@@ -1091,10 +1125,12 @@ function storeSettings() {
       deadzone: SETTINGS.deadzone,
       fov: SETTINGS.fov,
       projectileRate: SETTINGS.projectileRate,
-      recoilPatternStrength: SETTINGS.recoilPatternStrength,
+      recoilYStrength: SETTINGS.recoilYStrength,
+      recoilVariance: SETTINGS.recoilVariance,
+      recoilHorizontalOscillationStrength: SETTINGS.recoilHorizontalOscillationStrength,
+      recoilIntensityOscillator: SETTINGS.recoilIntensityOscillator,
       sphereSpeed: SETTINGS.sphereSpeed,
       responseCurve: SETTINGS.responseCurve,
-      recoilPatternShape: SETTINGS.recoilPatternShape,
       invertY: SETTINGS.invertY
     })
   );

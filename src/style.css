@@ -39,15 +39,17 @@ canvas {
   font-size: 16px;
 }
 
-.edge-panel {
-  padding-bottom: 46px;
+.panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-right: 36px;
 }
 
 .panel-toggle {
   position: absolute;
-  bottom: 10px;
-  left: 50%;
-  transform: translateX(-50%);
+  top: 10px;
+  right: 10px;
   z-index: 1;
   width: 28px;
   height: 28px;
@@ -60,8 +62,13 @@ canvas {
   background: rgba(255, 255, 255, 0.14);
 }
 
-.edge-panel.is-collapsed {
-  transform: translateY(var(--collapse-distance, 0px));
+.panel-content {
+  display: grid;
+  gap: 8px;
+}
+
+.edge-panel.is-collapsed .panel-content {
+  display: none;
 }
 
 .crosshair {
