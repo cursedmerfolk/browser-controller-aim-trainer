@@ -15,7 +15,6 @@ const LOW_HEALTH_COLOR = new THREE.Color(0xff4d6d);
 const FULL_HEALTH_EMISSIVE = new THREE.Color(0x07150d);
 const LOW_HEALTH_EMISSIVE = new THREE.Color(0x2a050a);
 const PROJECTILE_UP_AXIS = new THREE.Vector3(0, 1, 0);
-const WORLD_UP_AXIS = new THREE.Vector3(0, 1, 0);
 const MUZZLE_SCALE = new THREE.Vector3(1, 1, 1);
 const TARGET_BODY_BASE_HEIGHT = 0.96;
 const TARGET_HEAD_RADIUS = 0.18;
@@ -660,10 +659,10 @@ function loop() {
   applyLookInput(input.lookX, input.lookY, delta, directAimTarget, input.usingGamepad);
   updateCamera();
   updatePlayerVelocity(delta);
+  updateFiring(delta, input.shootPressed);
   applyAimAssist(delta);
   updateCamera();
   updateAimAssistDebugVisuals();
-  updateFiring(delta, input.shootPressed);
   updateWeaponTransform();
   updateTargets(delta);
   updateProjectiles(delta);
@@ -1064,21 +1063,12 @@ function applyHitToTarget(target) {
 
 function respawnTarget(target) {
   const distance = randomRange(SETTINGS.spawnDistanceMin, SETTINGS.spawnDistanceMax);
-  const horizontalForward = camera.getWorldDirection(new THREE.Vector3());
-  horizontalForward.y = 0;
-  if (horizontalForward.lengthSq() < 0.0001) {
-    horizontalForward.set(0, 0, -1);
-  } else {
-    horizontalForward.normalize();
-  }
-
-  const horizontalRight = new THREE.Vector3().crossVectors(horizontalForward, WORLD_UP_AXIS).normalize();
-  const halfWidth = Math.tan(THREE.MathUtils.degToRad(camera.fov / 2)) * distance * camera.aspect;
-  const lateralOffset = randomRange(-halfWidth * 0.32, halfWidth * 0.32);
-  const worldPosition = camera.position
-    .clone()
-    .addScaledVector(horizontalForward, distance)
-    .addScaledVector(horizontalRight, lateralOffset);
+  const spawnBoxHalfWidth = (backWall.geometry.parameters.width * 0.32) / 2;
+  const worldPosition = new THREE.Vector3(
+    randomRange(camera.position.x - spawnBoxHalfWidth, camera.position.x + spawnBoxHalfWidth),
+    camera.position.y,
+    camera.position.z - distance
+  );
   if (Math.random() < 0.3) {
     worldPosition.y = target.userData.feetClearance;
   } else {
