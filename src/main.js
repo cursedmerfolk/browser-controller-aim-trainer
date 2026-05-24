@@ -37,7 +37,7 @@ const DEFAULT_SETTINGS = {
   targetRadius: 0.45,
   targetMaxHealth: 12,
   spawnDistanceMin: 4,
-  spawnDistanceMax: 24,
+  spawnDistanceMax: 36,
   targetLifetimeMin: 6,
   targetLifetimeMax: 9,
   targetHorizontalSpeedMin: 0.45,
