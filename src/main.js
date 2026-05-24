@@ -176,10 +176,14 @@ app.innerHTML = `
       <div id="mode-status">Aim mode: HIP FIRE</div>
       <div id="curve-status">Curve: ${getResponseCurveLabel(SETTINGS.responseCurve)}</div>
       <div id="recoil-status">Recoil: Y ${SETTINGS.recoilYStrength.toFixed(2)} | Var ${SETTINGS.recoilVariance.toFixed(2)} | Osc ${SETTINGS.recoilHorizontalOscillationStrength.toFixed(2)} | Int ${SETTINGS.recoilIntensityOscillator.toFixed(2)}</div>
-      <div id="score">Score: 0</div>
       <div id="accuracy">Accuracy: 0%</div>
-      <div id="shots">Shots: 0 | Hits: 0</div>
+      <div id="hits">Hits: 0</div>
+      <div id="misses">Misses: 0</div>
+      <div id="score">Score (targets destroyed): 0</div>
       <div id="raw-stick">Raw stick: X 0.00 | Y 0.00</div>
+      <div class="button-row">
+        <button id="reset-button" type="button">Restart</button>
+      </div>
     </div>
   </div>
   <div class="crosshair" id="crosshair" aria-hidden="true">
@@ -414,7 +418,6 @@ app.innerHTML = `
       <div>Targets spawn on screen, drift sideways, and despawn after a short time.</div>
       <div class="button-row">
         <button id="discover-controller-button" type="button">Discover controller</button>
-        <button id="reset-button" type="button">Reset run</button>
       </div>
     </div>
   </div>
@@ -495,7 +498,8 @@ const hudElements = {
   recoilStatus: document.querySelector('#recoil-status'),
   score: document.querySelector('#score'),
   accuracy: document.querySelector('#accuracy'),
-  shots: document.querySelector('#shots'),
+  hits: document.querySelector('#hits'),
+  misses: document.querySelector('#misses'),
   rawStick: document.querySelector('#raw-stick'),
   crosshair: document.querySelector('#crosshair'),
   hudPanel: document.querySelector('#hud-panel'),
@@ -506,7 +510,8 @@ const hudElements = {
   responseCurveInput: document.querySelector('#response-curve-input'),
   invertYInput: document.querySelector('#invert-y-input'),
   showDebugShapesInput: document.querySelector('#show-debug-shapes-input'),
-  discoverControllerButton: document.querySelector('#discover-controller-button')
+  discoverControllerButton: document.querySelector('#discover-controller-button'),
+  resetButton: document.querySelector('#reset-button')
 };
 
 window.addEventListener('gamepadconnected', (event) => {
@@ -544,7 +549,7 @@ window.addEventListener('resize', () => {
   renderer.setSize(window.innerWidth, window.innerHeight);
 });
 
-document.querySelector('#reset-button').addEventListener('click', () => {
+hudElements.resetButton.addEventListener('click', () => {
   state.score = 0;
   state.shots = 0;
   state.hits = 0;
@@ -1196,11 +1201,11 @@ function createTarget() {
 
 function applyHitToTarget(target) {
   state.hits += 1;
-  state.score += 25;
   target.userData.health -= 1;
   playHitTickSound();
 
   if (target.userData.health <= 0) {
+    state.score += 1;
     respawnTarget(target);
     return;
   }
@@ -1533,14 +1538,16 @@ function updateCrosshair() {
 
 function updateHud() {
   const accuracy = state.shots === 0 ? 0 : Math.round((state.hits / state.shots) * 100);
+  const misses = Math.max(0, state.shots - state.hits);
 
   hudElements.gamepadStatus.textContent = `Controller: ${state.gamepadName}`;
   hudElements.modeStatus.textContent = `Aim mode: ${state.isAimingDownSights ? 'ADS' : 'HIP FIRE'}`;
   hudElements.curveStatus.textContent = `Curve: ${getResponseCurveLabel(SETTINGS.responseCurve)}`;
   hudElements.recoilStatus.textContent = `Recoil: Y ${SETTINGS.recoilYStrength.toFixed(2)} | Var ${SETTINGS.recoilVariance.toFixed(2)} | Osc ${SETTINGS.recoilHorizontalOscillationStrength.toFixed(2)} @ ${SETTINGS.recoilHorizontalOscillationSpeed.toFixed(2)} | Int ${SETTINGS.recoilIntensityOscillator.toFixed(2)} @ ${SETTINGS.recoilIntensityOscillationSpeed.toFixed(2)}`;
-  hudElements.score.textContent = `Score: ${state.score}`;
   hudElements.accuracy.textContent = `Accuracy: ${accuracy}%`;
-  hudElements.shots.textContent = `Shots: ${state.shots} | Hits: ${state.hits}`;
+  hudElements.hits.textContent = `Hits: ${state.hits}`;
+  hudElements.misses.textContent = `Misses: ${misses}`;
+  hudElements.score.textContent = `Score (targets destroyed): ${state.score}`;
   hudElements.rawStick.textContent = `Raw stick: X ${state.rawStickX.toFixed(2)} | Y ${state.rawStickY.toFixed(2)}`;
 }
 
