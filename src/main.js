@@ -36,8 +36,8 @@ const DEFAULT_SETTINGS = {
   targetCount: 8,
   targetRadius: 0.45,
   targetMaxHealth: 12,
-  spawnDistanceMin: 10,
-  spawnDistanceMax: 28,
+  spawnDistanceMin: 4,
+  spawnDistanceMax: 24,
   targetLifetimeMin: 6,
   targetLifetimeMax: 9,
   targetHorizontalSpeedMin: 0.45,
@@ -178,7 +178,7 @@ app.innerHTML = `
       id: 'recoil-variance',
       label: 'Recoil variance',
       min: 0,
-      max: 1,
+      max: 10,
       step: 0.05,
       value: SETTINGS.recoilVariance
     })}
@@ -448,7 +448,7 @@ bindNumericSetting({
 bindNumericSetting({
   id: 'recoil-variance',
   min: 0,
-  max: 1,
+  max: 10,
   fallback: DEFAULT_SETTINGS.recoilVariance,
   onChange: (value) => {
     SETTINGS.recoilVariance = value;
@@ -889,10 +889,12 @@ function respawnTarget(target) {
     worldPosition.y = randomRange(target.userData.feetClearance, 1.15);
   }
 
-  const horizontalVelocity = getHorizontalVelocity();
+  const moveSpeed = getRandomTargetMoveSpeed();
+  const horizontalVelocity = getHorizontalVelocity(moveSpeed);
 
   target.userData.basePosition.copy(worldPosition);
   target.userData.horizontalVelocity.copy(horizontalVelocity);
+  target.userData.moveSpeed = moveSpeed;
   target.userData.age = 0;
   target.userData.lifetime = randomRange(SETTINGS.targetLifetimeMin, SETTINGS.targetLifetimeMax);
   target.userData.health = target.userData.maxHealth;
@@ -916,7 +918,11 @@ function respawnTarget(target) {
   applyTargetHealthVisuals(target);
 }
 
-function getHorizontalVelocity() {
+function getRandomTargetMoveSpeed() {
+  return randomRange(SETTINGS.targetHorizontalSpeedMin, SETTINGS.targetHorizontalSpeedMax) * SETTINGS.sphereSpeed;
+}
+
+function getHorizontalVelocity(moveSpeed) {
   const direction = new THREE.Vector3(1, 0, 0).applyQuaternion(camera.quaternion);
   direction.y = 0;
 
@@ -926,11 +932,7 @@ function getHorizontalVelocity() {
     direction.normalize();
   }
 
-  return direction.multiplyScalar(
-    randomRange(SETTINGS.targetHorizontalSpeedMin, SETTINGS.targetHorizontalSpeedMax) *
-      SETTINGS.sphereSpeed *
-      (Math.random() < 0.5 ? -1 : 1)
-  );
+  return direction.multiplyScalar(moveSpeed * (Math.random() < 0.5 ? -1 : 1));
 }
 
 function resetTargets() {
@@ -1015,7 +1017,7 @@ function getBaseWeaponTransform() {
     position: new THREE.Vector3(
       THREE.MathUtils.lerp(0.24, 0, state.aimBlend),
       THREE.MathUtils.lerp(-0.2, -0.12, state.aimBlend),
-      THREE.MathUtils.lerp(-0.24, -0.17, state.aimBlend)
+      THREE.MathUtils.lerp(-0.16, -0.1, state.aimBlend)
     ),
     rotation: new THREE.Euler(
       THREE.MathUtils.lerp(-0.06, 0, state.aimBlend),
@@ -1164,7 +1166,7 @@ function loadStoredSettings() {
         2.5,
         DEFAULT_SETTINGS.recoilYStrength
       ),
-      recoilVariance: clampSetting(parsed.recoilVariance, 0, 1, DEFAULT_SETTINGS.recoilVariance),
+      recoilVariance: clampSetting(parsed.recoilVariance, 0, 10, DEFAULT_SETTINGS.recoilVariance),
       recoilHorizontalOscillationStrength: clampSetting(
         parsed.recoilHorizontalOscillationStrength,
         0,
