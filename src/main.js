@@ -1141,7 +1141,7 @@ function respawnTarget(target) {
   const distance = randomRange(SETTINGS.spawnDistanceMin, SETTINGS.spawnDistanceMax);
   const spawnBoxHalfWidth = (backWall.geometry.parameters.width * 0.32) / 2;
   const worldPosition = new THREE.Vector3(
-    randomRange(camera.position.x - spawnBoxHalfWidth, camera.position.x + spawnBoxHalfWidth),
+    camera.position.x + spawnBoxHalfWidth,
     camera.position.y,
     camera.position.z - distance
   );
@@ -1185,16 +1185,7 @@ function getRandomTargetMoveSpeed() {
 }
 
 function getHorizontalVelocity(moveSpeed) {
-  const direction = new THREE.Vector3(1, 0, 0).applyQuaternion(camera.quaternion);
-  direction.y = 0;
-
-  if (direction.lengthSq() < 0.0001) {
-    direction.set(1, 0, 0);
-  } else {
-    direction.normalize();
-  }
-
-  return direction.multiplyScalar(moveSpeed * (Math.random() < 0.5 ? -1 : 1));
+  return new THREE.Vector3(-moveSpeed, 0, 0);
 }
 
 function resetTargets() {
