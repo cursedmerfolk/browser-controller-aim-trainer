@@ -9,7 +9,7 @@ const RESPONSE_CURVE_OPTIONS = [
   { value: 'inverse-s', label: 'Inverse S' }
 ];
 
-const SPRAY_PATTERN_OPTIONS = [
+const RECOIL_PATTERN_OPTIONS = [
   { value: 'vertical', label: 'Vertical' },
   { value: 'zigzag', label: 'Zigzag' },
   { value: 'spiral', label: 'Spiral' }
@@ -28,14 +28,14 @@ const DEFAULT_SETTINGS = {
   fov: 75,
   responseCurve: 'linear',
   projectileRate: 14,
-  sprayPatternShape: 'vertical',
-  sprayPatternStrength: 0.45,
+  recoilPatternShape: 'vertical',
+  recoilPatternStrength: 0.45,
   sphereSpeed: 1.35,
   targetCount: 8,
   targetRadius: 0.45,
   targetMaxHealth: 12,
-  spawnDistanceMin: 9,
-  spawnDistanceMax: 16,
+  spawnDistanceMin: 14,
+  spawnDistanceMax: 28,
   targetLifetimeMin: 6,
   targetLifetimeMax: 9,
   targetHorizontalSpeedMin: 0.6,
@@ -93,7 +93,7 @@ app.innerHTML = `
     <div id="gamepad-status">Controller: ${state.gamepadName}</div>
     <div id="mode-status">Aim mode: HIP FIRE</div>
     <div id="curve-status">Curve: ${getResponseCurveLabel(SETTINGS.responseCurve)}</div>
-    <div id="spray-status">Spray pattern: ${getSprayPatternLabel(SETTINGS.sprayPatternShape)}</div>
+    <div id="recoil-status">Recoil pattern: ${getRecoilPatternLabel(SETTINGS.recoilPatternShape)}</div>
     <div id="score">Score: 0</div>
     <div id="accuracy">Accuracy: 0%</div>
     <div id="shots">Shots: 0 | Hits: 0</div>
@@ -158,12 +158,12 @@ app.innerHTML = `
       value: SETTINGS.sphereSpeed
     })}
     ${renderNumericControl({
-      id: 'spray-strength',
-      label: 'Spray strength',
+      id: 'recoil-strength',
+      label: 'Recoil strength',
       min: 0.05,
       max: 1.2,
       step: 0.05,
-      value: SETTINGS.sprayPatternStrength
+      value: SETTINGS.recoilPatternStrength
     })}
     <label class="control-group" for="response-curve-input">
       <span>Response curve</span>
@@ -171,10 +171,10 @@ app.innerHTML = `
         ${renderOptions(RESPONSE_CURVE_OPTIONS, SETTINGS.responseCurve)}
       </select>
     </label>
-    <label class="control-group" for="spray-pattern-input">
-      <span>Spray pattern</span>
-      <select id="spray-pattern-input">
-        ${renderOptions(SPRAY_PATTERN_OPTIONS, SETTINGS.sprayPatternShape)}
+    <label class="control-group" for="recoil-pattern-input">
+      <span>Recoil pattern</span>
+      <select id="recoil-pattern-input">
+        ${renderOptions(RECOIL_PATTERN_OPTIONS, SETTINGS.recoilPatternShape)}
       </select>
     </label>
     <label class="checkbox-row" for="invert-y-input">
@@ -228,19 +228,19 @@ directionalLight.castShadow = true;
 scene.add(directionalLight);
 
 const floor = new THREE.Mesh(
-  new THREE.PlaneGeometry(40, 60),
+  new THREE.PlaneGeometry(48, 100),
   new THREE.MeshStandardMaterial({ color: 0x1c2438, roughness: 0.75 })
 );
 floor.rotation.x = -Math.PI / 2;
-floor.position.z = -20;
+floor.position.z = -34;
 floor.receiveShadow = true;
 scene.add(floor);
 
 const backWall = new THREE.Mesh(
-  new THREE.PlaneGeometry(18, 8),
+  new THREE.PlaneGeometry(28, 12),
   new THREE.MeshStandardMaterial({ color: 0x182039, roughness: 0.8 })
 );
-backWall.position.set(0, 4, -22);
+backWall.position.set(0, 6, -40);
 backWall.receiveShadow = true;
 scene.add(backWall);
 
@@ -249,7 +249,8 @@ camera.add(weapon);
 
 const targets = [];
 const projectiles = [];
-const targetGeometry = new THREE.SphereGeometry(SETTINGS.targetRadius, 32, 32);
+const targetBodyGeometry = new THREE.BoxGeometry(0.34, 1.18, 0.16);
+const targetHeadGeometry = new THREE.SphereGeometry(0.17, 24, 24);
 const projectileGeometry = new THREE.CylinderGeometry(0.025, 0.025, 1, 10);
 const projectileMaterial = new THREE.MeshStandardMaterial({
   color: 0xfff2b6,
@@ -272,7 +273,7 @@ const hudElements = {
   gamepadStatus: document.querySelector('#gamepad-status'),
   modeStatus: document.querySelector('#mode-status'),
   curveStatus: document.querySelector('#curve-status'),
-  sprayStatus: document.querySelector('#spray-status'),
+  recoilStatus: document.querySelector('#recoil-status'),
   score: document.querySelector('#score'),
   accuracy: document.querySelector('#accuracy'),
   shots: document.querySelector('#shots'),
@@ -282,7 +283,7 @@ const hudElements = {
   settingsPanel: document.querySelector('#settings-panel'),
   controlsPanel: document.querySelector('#controls-panel'),
   responseCurveInput: document.querySelector('#response-curve-input'),
-  sprayPatternInput: document.querySelector('#spray-pattern-input'),
+  recoilPatternInput: document.querySelector('#recoil-pattern-input'),
   invertYInput: document.querySelector('#invert-y-input'),
   discoverControllerButton: document.querySelector('#discover-controller-button')
 };
@@ -388,12 +389,12 @@ bindNumericSetting({
 });
 
 bindNumericSetting({
-  id: 'spray-strength',
+  id: 'recoil-strength',
   min: 0.05,
   max: 1.2,
-  fallback: DEFAULT_SETTINGS.sprayPatternStrength,
+  fallback: DEFAULT_SETTINGS.recoilPatternStrength,
   onChange: (value) => {
-    SETTINGS.sprayPatternStrength = value;
+    SETTINGS.recoilPatternStrength = value;
   }
 });
 
@@ -402,8 +403,8 @@ hudElements.responseCurveInput.addEventListener('change', (event) => {
   storeSettings();
 });
 
-hudElements.sprayPatternInput.addEventListener('change', (event) => {
-  SETTINGS.sprayPatternShape = sanitizeSprayPattern(event.target.value);
+hudElements.recoilPatternInput.addEventListener('change', (event) => {
+  SETTINGS.recoilPatternShape = sanitizeRecoilPattern(event.target.value);
   storeSettings();
 });
 
@@ -512,6 +513,10 @@ function applyResponseCurve(value) {
   }
 }
 
+function getTargetRoot(object) {
+  return object.userData.targetRoot ?? object;
+}
+
 function applyLookInput(lookX, lookY, delta) {
   const sensitivityMultiplier = THREE.MathUtils.lerp(1, SETTINGS.adsSensitivityMultiplier, state.aimBlend);
   const lookSensitivity = SETTINGS.lookSensitivity * sensitivityMultiplier;
@@ -572,29 +577,29 @@ function updateFiring(delta, shootPressed) {
 function fireShot() {
   state.shots += 1;
 
-  const sprayPoint = getSprayPatternPoint(state.sprayShotIndex);
+  const sprayPoint = getRecoilPatternPoint(state.sprayShotIndex);
   const shotOffset = getShotOffset(sprayPoint.clone());
   state.sprayShotIndex += 1;
 
   state.spreadKick = Math.min(state.spreadKick + (state.isAimingDownSights ? 0.35 : 1), 3);
   state.weaponKick = Math.min(state.weaponKick + (state.isAimingDownSights ? 0.35 : 0.7), 1.2);
   state.recoilPatternX = THREE.MathUtils.clamp(
-    state.recoilPatternX + sprayPoint.x * SETTINGS.sprayPatternStrength * 0.08,
+    state.recoilPatternX + sprayPoint.x * SETTINGS.recoilPatternStrength * 0.08,
     -1.5,
     1.5
   );
   state.recoilPatternY = THREE.MathUtils.clamp(
-    state.recoilPatternY + sprayPoint.y * SETTINGS.sprayPatternStrength * 0.06,
+    state.recoilPatternY + sprayPoint.y * SETTINGS.recoilPatternStrength * 0.06,
     0,
     2
   );
 
   raycaster.setFromCamera(shotOffset, camera);
-  const intersections = raycaster.intersectObjects(targets, false);
+  const intersections = raycaster.intersectObjects(targets, true);
   const hitPoint = intersections[0]?.point ?? getMissPoint();
 
   if (intersections.length > 0) {
-    applyHitToTarget(intersections[0].object);
+    applyHitToTarget(getTargetRoot(intersections[0].object));
   }
 
   createProjectileVisual(getProjectileStart(), hitPoint);
@@ -610,7 +615,7 @@ function getProjectileStart() {
 
 function getShotOffset(sprayPoint) {
   const randomOffset = getRandomSpreadOffset();
-  const patternScale = SETTINGS.sprayPatternStrength * THREE.MathUtils.lerp(0.0028, 0.0012, state.aimBlend);
+  const patternScale = SETTINGS.recoilPatternStrength * THREE.MathUtils.lerp(0.0028, 0.0012, state.aimBlend);
 
   return randomOffset.add(sprayPoint.multiplyScalar(patternScale));
 }
@@ -633,10 +638,10 @@ function getCurrentSpreadPx() {
   return baseSpread + state.spreadKick * SETTINGS.shotSpreadKickPx;
 }
 
-function getSprayPatternPoint(shotIndex) {
+function getRecoilPatternPoint(shotIndex) {
   const step = shotIndex + 1;
 
-  switch (SETTINGS.sprayPatternShape) {
+  switch (SETTINGS.recoilPatternShape) {
     case 'zigzag':
       return new THREE.Vector2(
         (step % 2 === 0 ? -1 : 1) * Math.min(0.3 + step * 0.08, 1.4),
@@ -713,8 +718,18 @@ function createTarget() {
     emissiveIntensity: 0.35
   });
 
-  const target = new THREE.Mesh(targetGeometry, material);
-  target.castShadow = true;
+  const target = new THREE.Group();
+  const body = new THREE.Mesh(targetBodyGeometry, material);
+  const head = new THREE.Mesh(targetHeadGeometry, material);
+
+  body.position.y = 0.59;
+  head.position.y = 1.39;
+  body.castShadow = true;
+  head.castShadow = true;
+  body.userData.targetRoot = target;
+  head.userData.targetRoot = target;
+  target.add(body);
+  target.add(head);
   target.userData.maxHealth = SETTINGS.targetMaxHealth;
   target.userData.health = SETTINGS.targetMaxHealth;
   target.userData.basePosition = new THREE.Vector3();
@@ -723,6 +738,8 @@ function createTarget() {
   target.userData.lifetime = SETTINGS.targetLifetimeMax;
   target.userData.widthScale = 0.5;
   target.userData.heightScale = 2.1;
+  target.userData.feetClearance = 0.04;
+  target.userData.material = material;
 
   return target;
 }
@@ -746,7 +763,7 @@ function respawnTarget(target) {
   const halfWidth = halfHeight * camera.aspect;
   const localPosition = new THREE.Vector3(
     randomRange(-halfWidth * 0.55, halfWidth * 0.55),
-    randomRange(-halfHeight * 0.2, halfHeight * 0.35),
+    randomRange(-halfHeight * 0.04, halfHeight * 0.3),
     -distance
   );
   const worldPosition = camera.localToWorld(localPosition.clone());
@@ -761,6 +778,7 @@ function respawnTarget(target) {
   target.userData.widthScale = randomRange(0.38, 0.52);
   target.userData.heightScale = randomRange(1.9, 2.6);
 
+  worldPosition.y = Math.max(worldPosition.y, target.userData.feetClearance);
   target.position.copy(worldPosition);
   target.scale.set(
     target.userData.widthScale,
@@ -797,14 +815,15 @@ function resetTargets() {
 function applyTargetHealthVisuals(target) {
   const healthRatio = target.userData.health / target.userData.maxHealth;
 
-  target.material.color.lerpColors(LOW_HEALTH_COLOR, FULL_HEALTH_COLOR, healthRatio);
-  target.material.emissive.lerpColors(LOW_HEALTH_EMISSIVE, FULL_HEALTH_EMISSIVE, healthRatio);
+  target.userData.material.color.lerpColors(LOW_HEALTH_COLOR, FULL_HEALTH_COLOR, healthRatio);
+  target.userData.material.emissive.lerpColors(LOW_HEALTH_EMISSIVE, FULL_HEALTH_EMISSIVE, healthRatio);
 }
 
 function updateTargets(delta) {
   for (const target of targets) {
     target.userData.age += delta;
     target.userData.basePosition.addScaledVector(target.userData.horizontalVelocity, delta);
+    target.userData.basePosition.y = Math.max(target.userData.basePosition.y, target.userData.feetClearance);
     target.position.copy(target.userData.basePosition);
     target.rotation.y += delta * target.userData.rotationSpeed;
 
@@ -873,7 +892,7 @@ function updateHud() {
   hudElements.gamepadStatus.textContent = `Controller: ${state.gamepadName}`;
   hudElements.modeStatus.textContent = `Aim mode: ${state.isAimingDownSights ? 'ADS' : 'HIP FIRE'}`;
   hudElements.curveStatus.textContent = `Curve: ${getResponseCurveLabel(SETTINGS.responseCurve)}`;
-  hudElements.sprayStatus.textContent = `Spray pattern: ${getSprayPatternLabel(SETTINGS.sprayPatternShape)}`;
+  hudElements.recoilStatus.textContent = `Recoil pattern: ${getRecoilPatternLabel(SETTINGS.recoilPatternShape)}`;
   hudElements.score.textContent = `Score: ${state.score}`;
   hudElements.accuracy.textContent = `Accuracy: ${accuracy}%`;
   hudElements.shots.textContent = `Shots: ${state.shots} | Hits: ${state.hits}`;
@@ -980,16 +999,16 @@ function getResponseCurveLabel(value) {
   return RESPONSE_CURVE_OPTIONS.find((option) => option.value === value)?.label ?? 'Linear';
 }
 
-function getSprayPatternLabel(value) {
-  return SPRAY_PATTERN_OPTIONS.find((option) => option.value === value)?.label ?? 'Vertical';
+function getRecoilPatternLabel(value) {
+  return RECOIL_PATTERN_OPTIONS.find((option) => option.value === value)?.label ?? 'Vertical';
 }
 
 function sanitizeResponseCurve(value) {
   return RESPONSE_CURVE_OPTIONS.some((option) => option.value === value) ? value : DEFAULT_SETTINGS.responseCurve;
 }
 
-function sanitizeSprayPattern(value) {
-  return SPRAY_PATTERN_OPTIONS.some((option) => option.value === value) ? value : DEFAULT_SETTINGS.sprayPatternShape;
+function sanitizeRecoilPattern(value) {
+  return RECOIL_PATTERN_OPTIONS.some((option) => option.value === value) ? value : DEFAULT_SETTINGS.recoilPatternShape;
 }
 
 function loadStoredSettings() {
@@ -1006,10 +1025,15 @@ function loadStoredSettings() {
       deadzone: clampSetting(parsed.deadzone, 0, 0.35, DEFAULT_SETTINGS.deadzone),
       fov: clampSetting(parsed.fov, 50, 110, DEFAULT_SETTINGS.fov),
       projectileRate: clampSetting(parsed.projectileRate, 1, 15, DEFAULT_SETTINGS.projectileRate),
-      sprayPatternStrength: clampSetting(parsed.sprayPatternStrength, 0.05, 1.2, DEFAULT_SETTINGS.sprayPatternStrength),
+      recoilPatternStrength: clampSetting(
+        parsed.recoilPatternStrength ?? parsed.sprayPatternStrength,
+        0.05,
+        1.2,
+        DEFAULT_SETTINGS.recoilPatternStrength
+      ),
       sphereSpeed: clampSetting(parsed.sphereSpeed, 0.4, 2.5, DEFAULT_SETTINGS.sphereSpeed),
       responseCurve: sanitizeResponseCurve(parsed.responseCurve),
-      sprayPatternShape: sanitizeSprayPattern(parsed.sprayPatternShape),
+      recoilPatternShape: sanitizeRecoilPattern(parsed.recoilPatternShape ?? parsed.sprayPatternShape),
       invertY: typeof parsed.invertY === 'boolean' ? parsed.invertY : DEFAULT_SETTINGS.invertY
     };
   } catch (error) {
@@ -1026,10 +1050,10 @@ function storeSettings() {
       deadzone: SETTINGS.deadzone,
       fov: SETTINGS.fov,
       projectileRate: SETTINGS.projectileRate,
-      sprayPatternStrength: SETTINGS.sprayPatternStrength,
+      recoilPatternStrength: SETTINGS.recoilPatternStrength,
       sphereSpeed: SETTINGS.sphereSpeed,
       responseCurve: SETTINGS.responseCurve,
-      sprayPatternShape: SETTINGS.sprayPatternShape,
+      recoilPatternShape: SETTINGS.recoilPatternShape,
       invertY: SETTINGS.invertY
     })
   );
