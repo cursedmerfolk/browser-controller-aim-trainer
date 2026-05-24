@@ -15,6 +15,7 @@ const FULL_HEALTH_EMISSIVE = new THREE.Color(0x07150d);
 const LOW_HEALTH_EMISSIVE = new THREE.Color(0x2a050a);
 const PROJECTILE_UP_AXIS = new THREE.Vector3(0, 1, 0);
 const WORLD_UP_AXIS = new THREE.Vector3(0, 1, 0);
+const MUZZLE_SCALE = new THREE.Vector3(1, 1, 1);
 const TARGET_BODY_BASE_HEIGHT = 0.96;
 const TARGET_HEAD_RADIUS = 0.18;
 
@@ -194,7 +195,7 @@ app.innerHTML = `
       label: 'Recoil horiz. osc. speed',
       min: 0.1,
       max: 3,
-      step: 0.05,
+      step: 0.01,
       value: SETTINGS.recoilHorizontalOscillationSpeed
     })}
     ${renderNumericControl({
@@ -702,7 +703,12 @@ function getMissPoint() {
 }
 
 function getProjectileStart() {
-  return weapon.localToWorld(weapon.userData.barrelTipLocal.clone());
+  const weaponTransform = getBaseWeaponTransform();
+  const muzzleMatrix = new THREE.Matrix4()
+    .makeRotationFromEuler(weaponTransform.rotation)
+    .setPosition(weaponTransform.position);
+
+  return camera.localToWorld(weapon.userData.barrelTipLocal.clone().applyMatrix4(muzzleMatrix));
 }
 
 function applyAimRecoil(recoilPoint) {
@@ -743,14 +749,16 @@ function getCurrentSpreadPx() {
 }
 
 function getRecoilPoint(shotIndex) {
-  const step = shotIndex + 1;
+  const step = shotIndex;
   const intensityOscillation =
     Math.sin(step * SETTINGS.recoilIntensityOscillationSpeed) * SETTINGS.recoilIntensityOscillator;
-  const oscillationRate = SETTINGS.recoilHorizontalOscillationSpeed + intensityOscillation * 0.55;
-  const intensityScale = Math.max(0.15, 1 + intensityOscillation * 0.7);
-  const expectedX = Math.sin(step * oscillationRate) * SETTINGS.recoilHorizontalOscillationStrength * intensityScale;
-  const varianceX = randomRange(-SETTINGS.recoilVariance, SETTINGS.recoilVariance);
-  const varianceY = randomRange(-SETTINGS.recoilVariance, SETTINGS.recoilVariance);
+  const intensityScale = Math.max(0, 1 + intensityOscillation);
+  const expectedX =
+    Math.sin(step * SETTINGS.recoilHorizontalOscillationSpeed) *
+    SETTINGS.recoilHorizontalOscillationStrength *
+    intensityScale;
+  const varianceX = SETTINGS.recoilVariance <= 0 ? 0 : randomRange(-SETTINGS.recoilVariance, SETTINGS.recoilVariance);
+  const varianceY = SETTINGS.recoilVariance <= 0 ? 0 : randomRange(-SETTINGS.recoilVariance, SETTINGS.recoilVariance);
 
   return new THREE.Vector2(
     expectedX + varianceX,
@@ -987,17 +995,36 @@ function createWeaponModel() {
 }
 
 function updateWeaponTransform() {
+  const baseTransform = getBaseWeaponTransform();
+
   weapon.position.set(
-    THREE.MathUtils.lerp(0.24, 0, state.aimBlend) + state.recoilPatternX * 0.01 * (1 - state.aimBlend * 0.85),
-    THREE.MathUtils.lerp(-0.2, -0.12, state.aimBlend) - state.weaponKick * 0.025 - state.recoilPatternY * 0.008,
-    THREE.MathUtils.lerp(-0.24, -0.17, state.aimBlend) + state.weaponKick * 0.05
+    baseTransform.position.x + state.recoilPatternX * 0.01 * (1 - state.aimBlend * 0.85),
+    baseTransform.position.y - state.weaponKick * 0.025 - state.recoilPatternY * 0.008,
+    baseTransform.position.z + state.weaponKick * 0.05
   );
 
   weapon.rotation.set(
-    THREE.MathUtils.lerp(-0.06, 0, state.aimBlend) + state.weaponKick * 0.14 + state.recoilPatternY * 0.06,
-    THREE.MathUtils.lerp(-0.12, 0, state.aimBlend),
-    THREE.MathUtils.lerp(-0.02, 0, state.aimBlend) - state.recoilPatternX * 0.09 * (1 - state.aimBlend * 0.85)
+    baseTransform.rotation.x + state.weaponKick * 0.14 + state.recoilPatternY * 0.06,
+    baseTransform.rotation.y,
+    baseTransform.rotation.z - state.recoilPatternX * 0.09 * (1 - state.aimBlend * 0.85)
   );
+}
+
+function getBaseWeaponTransform() {
+  return {
+    position: new THREE.Vector3(
+      THREE.MathUtils.lerp(0.24, 0, state.aimBlend),
+      THREE.MathUtils.lerp(-0.2, -0.12, state.aimBlend),
+      THREE.MathUtils.lerp(-0.24, -0.17, state.aimBlend)
+    ),
+    rotation: new THREE.Euler(
+      THREE.MathUtils.lerp(-0.06, 0, state.aimBlend),
+      THREE.MathUtils.lerp(-0.12, 0, state.aimBlend),
+      THREE.MathUtils.lerp(-0.02, 0, state.aimBlend),
+      'XYZ'
+    ),
+    scale: MUZZLE_SCALE
+  };
 }
 
 function updateCrosshair() {

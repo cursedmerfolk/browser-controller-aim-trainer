@@ -127,6 +127,10 @@ canvas {
   left: calc(50% + var(--gap));
 }
 
+.crosshair[data-mode='ads'] .crosshair-tick {
+  display: none;
+}
+
 .instructions {
   position: fixed;
   left: 16px;
