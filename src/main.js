@@ -21,7 +21,7 @@ const TARGET_BODY_BASE_HEIGHT = 0.96;
 const TARGET_HEAD_RADIUS = 0.18;
 const CENTER_SCREEN = new THREE.Vector2(0, 0);
 const BULLET_MAGNETISM_CONE_ANGLE = THREE.MathUtils.degToRad(8);
-const ADS_SNAP_CONE_ANGLE = THREE.MathUtils.degToRad(10);
+const ADS_SNAP_CYLINDER_RADIUS = 1;
 const DEBUG_VISUAL_OFFSET = 0.2;
 const LEGACY_TARGET_SPEED_MIN = 0.45;
 const LEGACY_TARGET_SPEED_MAX = 1.8;
@@ -52,6 +52,7 @@ const DEFAULT_SETTINGS = {
   aimSlow: 0,
   aimStickiness: 0,
   adsSnap: 0,
+  showDebugShapes: true,
   recoilYStrength: 0.6,
   recoilVariance: 0.18,
   recoilHorizontalOscillationStrength: 0.3,
@@ -296,6 +297,10 @@ app.innerHTML = `
       <input id="invert-y-input" type="checkbox" ${SETTINGS.invertY ? 'checked' : ''} />
       <span>Invert Y</span>
     </label>
+    <label class="checkbox-row" for="show-debug-shapes-input">
+      <input id="show-debug-shapes-input" type="checkbox" ${SETTINGS.showDebugShapes ? 'checked' : ''} />
+      <span>Show debug shapes</span>
+    </label>
     </div>
   </div>
   <div class="hud-panel instructions edge-panel is-collapsed" id="controls-panel" data-side="left">
@@ -407,6 +412,7 @@ const hudElements = {
   controlsPanel: document.querySelector('#controls-panel'),
   responseCurveInput: document.querySelector('#response-curve-input'),
   invertYInput: document.querySelector('#invert-y-input'),
+  showDebugShapesInput: document.querySelector('#show-debug-shapes-input'),
   discoverControllerButton: document.querySelector('#discover-controller-button')
 };
 
@@ -638,6 +644,11 @@ hudElements.invertYInput.addEventListener('change', (event) => {
   storeSettings();
 });
 
+hudElements.showDebugShapesInput.addEventListener('change', (event) => {
+  SETTINGS.showDebugShapes = event.target.checked;
+  storeSettings();
+});
+
 initializePanelToggles();
 
 function loop() {
@@ -782,12 +793,21 @@ function applyAimAssist(delta) {
     state.yaw += getStickinessYawNudge(directAimTarget, delta) * SETTINGS.aimStickiness;
   }
 
-  if (state.isAimingDownSights && SETTINGS.adsSnap > 0) {
-    const nearbyTarget = getNearestTargetInCone(getCameraOrigin(), getCameraForward(), ADS_SNAP_CONE_ANGLE);
+  if (isAdsSnapActive() && SETTINGS.adsSnap > 0) {
+    const nearbyTarget = getNearestTargetInCylinder(
+      getCameraOrigin(),
+      getCameraForward(),
+      ADS_SNAP_CYLINDER_RADIUS,
+      SETTINGS.projectileMaxDistance
+    );
     if (nearbyTarget) {
-      nudgeAimTowardTarget(nearbyTarget, 1 - Math.exp(-delta * 14 * SETTINGS.adsSnap));
+      nudgeAimTowardTarget(nearbyTarget, 1 - Math.exp(-delta * 14 * SETTINGS.adsSnap), false);
     }
   }
+}
+
+function isAdsSnapActive() {
+  return state.isAimingDownSights && state.aimBlend <= 0.9;
 }
 
 function updateCamera() {
@@ -1054,7 +1074,7 @@ function respawnTarget(target) {
 
   const horizontalRight = new THREE.Vector3().crossVectors(horizontalForward, WORLD_UP_AXIS).normalize();
   const halfWidth = Math.tan(THREE.MathUtils.degToRad(camera.fov / 2)) * distance * camera.aspect;
-  const lateralOffset = randomRange(-halfWidth * 0.5, halfWidth * 0.5);
+  const lateralOffset = randomRange(-halfWidth * 0.32, halfWidth * 0.32);
   const worldPosition = camera.position
     .clone()
     .addScaledVector(horizontalForward, distance)
@@ -1178,10 +1198,10 @@ function createAimAssistDebugVisuals() {
   const magnetismCone = createDebugCone(BULLET_MAGNETISM_CONE_ANGLE, lineLength, 0xffb347);
   group.add(magnetismCone);
 
-  const adsSnapCone = createDebugCone(ADS_SNAP_CONE_ANGLE, lineLength, 0xff4d6d);
-  group.add(adsSnapCone);
+  const adsSnapCylinder = createDebugCylinder(ADS_SNAP_CYLINDER_RADIUS, lineLength, 0xff4d6d);
+  group.add(adsSnapCylinder);
 
-  return { group, magnetismCone, adsSnapCone };
+  return { group, magnetismCone, adsSnapCylinder };
 }
 
 function createDebugLine(color, length) {
@@ -1251,12 +1271,74 @@ function createDebugCone(angle, length, color) {
   return coneGroup;
 }
 
+function createDebugCylinder(radius, length, color) {
+  const cylinderGroup = new THREE.Group();
+  const surfaceMaterial = new THREE.MeshBasicMaterial({
+    color,
+    transparent: true,
+    opacity: 0.12,
+    side: THREE.DoubleSide,
+    depthWrite: false,
+    depthTest: false
+  });
+  const cylinder = new THREE.Mesh(new THREE.CylinderGeometry(radius, radius, length, 24, 1, true), surfaceMaterial);
+  cylinder.rotation.x = Math.PI / 2;
+  cylinder.position.z = -length / 2;
+  cylinder.renderOrder = 10;
+  cylinderGroup.add(cylinder);
+
+  const wireframe = new THREE.LineSegments(
+    new THREE.EdgesGeometry(new THREE.CylinderGeometry(radius, radius, length, 24, 1, true)),
+    new THREE.LineBasicMaterial({
+      color,
+      transparent: true,
+      opacity: 0.95,
+      depthTest: false
+    })
+  );
+  wireframe.rotation.x = Math.PI / 2;
+  wireframe.position.z = -length / 2;
+  wireframe.renderOrder = 12;
+  cylinderGroup.add(wireframe);
+
+  const endRingMaterial = new THREE.LineBasicMaterial({
+    color,
+    transparent: true,
+    opacity: 0.95,
+    depthTest: false
+  });
+  const frontRing = createDebugRing(radius, 0, endRingMaterial);
+  const backRing = createDebugRing(radius, -length, endRingMaterial);
+  cylinderGroup.add(frontRing);
+  cylinderGroup.add(backRing);
+
+  const centerLine = createDebugLine(color, length);
+  cylinderGroup.add(centerLine);
+
+  return cylinderGroup;
+}
+
+function createDebugRing(radius, z, material) {
+  const ring = new THREE.LineLoop(
+    new THREE.BufferGeometry().setFromPoints(
+      Array.from({ length: 32 }, (_, index) => {
+        const theta = (index / 32) * Math.PI * 2;
+        return new THREE.Vector3(Math.cos(theta) * radius, Math.sin(theta) * radius, z);
+      })
+    ),
+    material
+  );
+  ring.renderOrder = 12;
+  return ring;
+}
+
 function updateAimAssistDebugVisuals() {
   const debugOrigin = getCameraOrigin().addScaledVector(getCameraForward(), DEBUG_VISUAL_OFFSET);
   aimAssistDebugVisuals.group.position.copy(debugOrigin);
   aimAssistDebugVisuals.group.quaternion.copy(camera.getWorldQuaternion(new THREE.Quaternion()));
-  aimAssistDebugVisuals.magnetismCone.visible = SETTINGS.bulletMagnetism > 0;
-  aimAssistDebugVisuals.adsSnapCone.visible = SETTINGS.adsSnap > 0 && state.isAimingDownSights;
+  aimAssistDebugVisuals.group.visible = SETTINGS.showDebugShapes;
+  aimAssistDebugVisuals.magnetismCone.visible = SETTINGS.showDebugShapes && SETTINGS.bulletMagnetism > 0;
+  aimAssistDebugVisuals.adsSnapCylinder.visible = SETTINGS.showDebugShapes && SETTINGS.adsSnap > 0 && isAdsSnapActive();
 }
 
 function updateWeaponTransform() {
@@ -1451,6 +1533,8 @@ function loadStoredSettings() {
       aimSlow: clampSetting(storedSettings.aimSlow, 0, 1, DEFAULT_SETTINGS.aimSlow),
       aimStickiness: clampSetting(storedSettings.aimStickiness, 0, 1, DEFAULT_SETTINGS.aimStickiness),
       adsSnap: clampSetting(storedSettings.adsSnap, 0, 1, DEFAULT_SETTINGS.adsSnap),
+      showDebugShapes:
+        typeof storedSettings.showDebugShapes === 'boolean' ? storedSettings.showDebugShapes : DEFAULT_SETTINGS.showDebugShapes,
       recoilYStrength: clampSetting(
         storedSettings.recoilYStrength ?? storedSettings.recoilPatternStrength ?? storedSettings.sprayPatternStrength,
         0.05,
@@ -1507,6 +1591,7 @@ function storeSettings() {
         aimSlow: SETTINGS.aimSlow,
         aimStickiness: SETTINGS.aimStickiness,
         adsSnap: SETTINGS.adsSnap,
+        showDebugShapes: SETTINGS.showDebugShapes,
         recoilYStrength: SETTINGS.recoilYStrength,
         recoilVariance: SETTINGS.recoilVariance,
         recoilHorizontalOscillationStrength: SETTINGS.recoilHorizontalOscillationStrength,
@@ -1569,8 +1654,35 @@ function getDirectAimTarget() {
   return intersections[0] ? getTargetRoot(intersections[0].object) : null;
 }
 
-function getTargetAimPoint(target) {
-  return target.position.clone().add(new THREE.Vector3(0, target.userData.totalHeight * 0.62, 0));
+function getTargetAimPoint(target, origin = getCameraOrigin(), direction = getCameraForward()) {
+  const samplePoints = getTargetSamplePoints(target);
+  let bestPoint = samplePoints[0];
+  let bestAngle = Number.POSITIVE_INFINITY;
+  let bestDistance = Number.POSITIVE_INFINITY;
+
+  for (const samplePoint of samplePoints) {
+    const toPoint = samplePoint.clone().sub(origin);
+    const distance = toPoint.length();
+    if (distance <= 0.0001) {
+      continue;
+    }
+
+    const angle = direction.angleTo(toPoint.clone().normalize());
+    if (angle < bestAngle || (Math.abs(angle - bestAngle) < 0.0001 && distance < bestDistance)) {
+      bestPoint = samplePoint;
+      bestAngle = angle;
+      bestDistance = distance;
+    }
+  }
+
+  return bestPoint;
+}
+
+function getTargetSamplePoints(target) {
+  return [
+    target.localToWorld(target.userData.body.position.clone()),
+    target.localToWorld(target.userData.head.position.clone())
+  ];
 }
 
 function getNearestTargetInCone(origin, direction, maxAngle) {
@@ -1580,7 +1692,7 @@ function getNearestTargetInCone(origin, direction, maxAngle) {
   const normalizedDirection = direction.clone().normalize();
 
   for (const target of targets) {
-    const toTarget = getTargetAimPoint(target).sub(origin);
+    const toTarget = getTargetAimPoint(target, origin, normalizedDirection).sub(origin);
     const distance = toTarget.length();
     if (distance <= 0.0001 || distance > SETTINGS.projectileMaxDistance) {
       continue;
@@ -1601,8 +1713,40 @@ function getNearestTargetInCone(origin, direction, maxAngle) {
   return nearestTarget;
 }
 
+function getNearestTargetInCylinder(origin, direction, radius, maxDistance) {
+  let nearestTarget = null;
+  let nearestAlongDistance = Number.POSITIVE_INFINITY;
+  let nearestRadialDistance = Number.POSITIVE_INFINITY;
+  const normalizedDirection = direction.clone().normalize();
+
+  for (const target of targets) {
+    const toTarget = getTargetAimPoint(target, origin, normalizedDirection).sub(origin);
+    const alongDistance = toTarget.dot(normalizedDirection);
+    if (alongDistance <= 0 || alongDistance > maxDistance) {
+      continue;
+    }
+
+    const radialVector = toTarget.sub(normalizedDirection.clone().multiplyScalar(alongDistance));
+    const radialDistance = radialVector.length();
+    if (radialDistance > radius) {
+      continue;
+    }
+
+    if (
+      alongDistance < nearestAlongDistance ||
+      (Math.abs(alongDistance - nearestAlongDistance) < 0.001 && radialDistance < nearestRadialDistance)
+    ) {
+      nearestTarget = target;
+      nearestAlongDistance = alongDistance;
+      nearestRadialDistance = radialDistance;
+    }
+  }
+
+  return nearestTarget;
+}
+
 function nudgeAimTowardTarget(target, amount, adjustPitch = true) {
-  const targetDirection = getTargetAimPoint(target).sub(getCameraOrigin()).normalize();
+  const targetDirection = getTargetAimPoint(target, getCameraOrigin(), getCameraForward()).sub(getCameraOrigin()).normalize();
   const desiredYaw = Math.atan2(-targetDirection.x, -targetDirection.z);
 
   state.yaw += getShortestAngleDelta(state.yaw, desiredYaw) * amount;
@@ -1615,7 +1759,7 @@ function nudgeAimTowardTarget(target, amount, adjustPitch = true) {
 
 function getStickinessYawNudge(target, delta) {
   const origin = getCameraOrigin();
-  const currentTargetPoint = getHorizontalStickinessPoint(target, origin.y);
+  const currentTargetPoint = getHorizontalStickinessPoint(getTargetAimPoint(target, origin, getCameraForward()), origin.y);
   const predictedTargetPoint = currentTargetPoint.clone().addScaledVector(getRelativeTargetVelocity(target), delta);
   const currentYaw = getYawToPoint(origin, currentTargetPoint);
   const predictedYaw = getYawToPoint(origin, predictedTargetPoint);
@@ -1626,8 +1770,8 @@ function getRelativeTargetVelocity(target) {
   return target.userData.horizontalVelocity.clone().sub(state.playerVelocity.clone().setY(0)).setY(0);
 }
 
-function getHorizontalStickinessPoint(target, originY) {
-  return new THREE.Vector3(target.position.x, originY, target.position.z);
+function getHorizontalStickinessPoint(point, originY) {
+  return new THREE.Vector3(point.x, originY, point.z);
 }
 
 function getYawToPoint(origin, point) {
