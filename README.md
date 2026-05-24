@@ -9,12 +9,13 @@ The app uses:
 - Browser Gamepad API for controller input
 - Keyboard fallback controls for testing without a controller
 - Game and gun setting profiles with selectable dropdowns and create-new prompts
-- Live controller tuning controls for sensitivity, deadzone, FOV, FPS max, invert-Y, and response curves
+- Live controller tuning controls for controller sensitivity, mouse sensitivity, deadzone, FOV, FPS max, invert-Y, and response curves
 - Live projectile-rate, aim-assist, min/max target-speed, target Y spawn variance, target Y oscillation, and recoil tuning controls with keyboard-editable numeric inputs
 - ADS with a simple rifle viewmodel, tighter aim handling, and automatic fire
 - Four aim-assist controls: bullet magnetism, aim slow, aim stickiness, and ADS snap
 - A toggle for showing or hiding the aim-assist debug shapes
-- Moving multi-hit targets that shift from green to red as they take damage, including optional sinusoidal Y motion
+- Up to three moving multi-hit targets that shift from green to red as they take damage, including optional sinusoidal Y motion
+- Enemy target shots, player health, and loss/restart flow
 - VS Code Dev Containers for a reproducible development environment
 
 ## Getting started in VS Code Dev Containers
@@ -40,9 +41,9 @@ The proof of concept is ready when the browser shows:
 - visible projectile tracers that animate even though hits are resolved immediately
 - a rifle-like held weapon in first person
 - a dynamic tick-mark crosshair that tightens when aiming down sights
-- score, hits, shots, accuracy, and raw stick values in the HUD
-- a controller settings panel with game profile and gun profile selectors, plus sensitivity, deadzone, FOV, FPS max, projectile rate, bullet magnetism, aim slow, aim stickiness, ADS snap, min target speed, max target speed, target Y spawn variance, target Y oscillation amplitude, target Y oscillation speed, recoil Y strength, recoil variance, recoil horizontal oscillation, recoil horizontal oscillation speed, recoil intensity oscillator, recoil intensity oscillator speed, invert-Y, show debug shapes, and response curves
-- keyboard fallback aiming and shooting if no controller is connected
+- score, hits, misses, accuracy, health, FPS, and raw stick values in the HUD
+- a controller settings panel with game profile and gun profile selectors, plus sensitivity, mouse sensitivity, deadzone, FOV, FPS max, projectile rate, bullet magnetism, aim slow, aim stickiness, ADS snap, min target speed, max target speed, target Y spawn variance, target Y oscillation amplitude, target Y oscillation speed, recoil Y strength, recoil variance, recoil horizontal oscillation, recoil horizontal oscillation speed, recoil intensity oscillator, recoil intensity oscillator speed, invert-Y, show debug shapes, and response curves
+- mouse-look desktop controls with no auto aim, plus keyboard fallback strafing/shooting
 
 ## Local scripts
 
@@ -56,14 +57,16 @@ npm run build
 Controller:
 
 - Right stick: aim
+- Left stick: strafe left/right
 - Left trigger / L2: aim down sights
 - Right trigger / R2: fire
 
-Keyboard fallback:
+Mouse and keyboard:
 
-- WASD or arrow keys: aim
-- Shift: aim down sights
-- Space: fire
+- Click the game view: capture mouse aim
+- A / D or left / right arrows: strafe left/right
+- Left click or Space: fire
+- Right click or Shift: aim down sights
 
 ## Browser notes
 

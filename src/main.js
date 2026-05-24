@@ -20,6 +20,14 @@ const TARGET_BODY_BASE_HEIGHT = 0.96;
 const TARGET_HEAD_RADIUS = 0.18;
 const BODY_SHOT_DAMAGE = 1;
 const HEAD_SHOT_DAMAGE = 1.5;
+const PLAYER_EYE_HEIGHT = 2.2;
+const PLAYER_MAX_HEALTH = 5;
+const PLAYER_STRAFE_SPEED = 5.5;
+const TARGET_FIRE_INTERVAL_MIN = 1.4;
+const TARGET_FIRE_INTERVAL_MAX = 2.6;
+const TARGET_PROJECTILE_DAMAGE = 1;
+const TARGET_PROJECTILE_HIT_RADIUS = 0.4;
+const TARGET_PROJECTILE_SPEED = 18;
 const CENTER_SCREEN = new THREE.Vector2(0, 0);
 const BULLET_MAGNETISM_CONE_ANGLE = THREE.MathUtils.degToRad(1);
 const ADS_SNAP_CYLINDER_RADIUS = 1;
@@ -46,6 +54,7 @@ const LEGACY_SETTINGS_ORDER = [
 ];
 const GAME_SETTING_KEYS = [
   'lookSensitivity',
+  'mouseSensitivity',
   'deadzone',
   'invertY',
   'fov',
@@ -91,6 +100,7 @@ const GUN_SETTING_KEYS = [
 
 const DEFAULT_SETTINGS = {
   lookSensitivity: 2.8,
+  mouseSensitivity: 0.22,
   deadzone: 0.12,
   invertY: false,
   fov: 110,
@@ -110,7 +120,7 @@ const DEFAULT_SETTINGS = {
   recoilIntensityOscillationSpeed: 0.37,
   targetHorizontalSpeedMin: 0.61,
   targetHorizontalSpeedMax: 2.43,
-  targetCount: 8,
+  targetCount: 3,
   targetRadius: 0.45,
   targetMaxHealth: 12,
   targetSpawnYVariance: 1.11,
@@ -141,12 +151,18 @@ const state = {
   hits: 0,
   fps: 0,
   lastFrameTime: null,
+  playerHealth: PLAYER_MAX_HEALTH,
+  isGameOver: false,
   activeGamepadIndex: null,
   gamepadName: 'No controller detected',
   yaw: 0,
   pitch: 0,
   rawStickX: 0,
   rawStickY: 0,
+  pendingMouseLookX: 0,
+  pendingMouseLookY: 0,
+  mouseShootPressed: false,
+  mouseAdsPressed: false,
   playerVelocity: new THREE.Vector3(),
   isAimingDownSights: false,
   aimBlend: 0,
@@ -180,10 +196,12 @@ app.innerHTML = `
     <div class="panel-content">
       <div id="gamepad-status">Controller: ${state.gamepadName}</div>
       <div id="framerate">FPS: 0</div>
+      <div id="health" class="hud-stat">Health: ${PLAYER_MAX_HEALTH}</div>
       <div id="accuracy" class="hud-stat">Accuracy: 0%</div>
       <div id="hits" class="hud-stat">Hits: 0</div>
       <div id="misses" class="hud-stat">Misses: 0</div>
       <div id="score" class="hud-stat hud-stat-primary">Score: 0</div>
+      <div id="status">Status: READY</div>
       <div id="raw-stick">Raw stick: X 0.00 | Y 0.00</div>
       <div class="button-row">
         <button id="reset-button" type="button">Restart</button>
@@ -232,6 +250,14 @@ app.innerHTML = `
       max: 10,
       step: 0.1,
       value: SETTINGS.lookSensitivity
+    })}
+    ${renderNumericControl({
+      id: 'mouse-sensitivity',
+      label: 'Mouse sensitivity',
+      min: 0.05,
+      max: 1,
+      step: 0.01,
+      value: SETTINGS.mouseSensitivity
     })}
     ${renderNumericControl({
       id: 'deadzone',
@@ -423,11 +449,13 @@ app.innerHTML = `
       </button>
     </div>
     <div class="panel-content">
-      <div>Right stick: aim</div>
+      <div>Mouse or right stick: aim</div>
+      <div>Click the game view to capture mouse look</div>
+      <div>Left stick / A-D / left-right arrows: strafe</div>
       <div>Left trigger / L2: aim down sights</div>
-      <div>Right trigger / R2: fire continuously</div>
-      <div>Keyboard fallback: arrow keys/WASD aim, Shift ADS, Space fire</div>
-      <div>Targets spawn on screen, drift sideways, and despawn after a short time.</div>
+      <div>Left click / Space / Right trigger / R2: fire continuously</div>
+      <div>Right click / Shift: aim down sights</div>
+      <div>Targets strafe, shoot at your last seen position, and despawn after a short time.</div>
       <div class="button-row">
         <button id="discover-controller-button" type="button">Discover controller</button>
       </div>
@@ -446,7 +474,7 @@ scene.background = new THREE.Color(0x0b1020);
 scene.fog = new THREE.Fog(0x0b1020, 36, 110);
 
 const camera = new THREE.PerspectiveCamera(SETTINGS.fov, window.innerWidth / window.innerHeight, 0.1, 100);
-camera.position.set(0, 2.2, 0);
+camera.position.set(0, PLAYER_EYE_HEIGHT, 0);
 scene.add(camera);
 const previousCameraOrigin = camera.position.clone();
 
@@ -483,6 +511,7 @@ scene.add(aimAssistDebugVisuals.group);
 
 const targets = [];
 const projectiles = [];
+const enemyProjectiles = [];
 const targetBodyGeometry = new THREE.BoxGeometry(0.36, TARGET_BODY_BASE_HEIGHT, 0.36);
 const targetHeadGeometry = new THREE.SphereGeometry(TARGET_HEAD_RADIUS, 24, 24);
 const projectileGeometry = new THREE.CylinderGeometry(0.025, 0.025, 1, 10);
@@ -491,6 +520,12 @@ const projectileMaterial = new THREE.MeshStandardMaterial({
   emissive: 0xffb347,
   emissiveIntensity: 1.2,
   roughness: 0.15
+});
+const enemyProjectileMaterial = new THREE.MeshStandardMaterial({
+  color: 0xff7a7a,
+  emissive: 0xff3d3d,
+  emissiveIntensity: 1,
+  roughness: 0.25
 });
 
 for (let index = 0; index < SETTINGS.targetCount; index += 1) {
@@ -505,10 +540,12 @@ const keyboard = new Set();
 const hudElements = {
   gamepadStatus: document.querySelector('#gamepad-status'),
   framerate: document.querySelector('#framerate'),
+  health: document.querySelector('#health'),
   score: document.querySelector('#score'),
   accuracy: document.querySelector('#accuracy'),
   hits: document.querySelector('#hits'),
   misses: document.querySelector('#misses'),
+  status: document.querySelector('#status'),
   rawStick: document.querySelector('#raw-stick'),
   crosshair: document.querySelector('#crosshair'),
   hudPanel: document.querySelector('#hud-panel'),
@@ -533,6 +570,53 @@ window.addEventListener('gamepaddisconnected', (event) => {
     state.activeGamepadIndex = null;
     state.gamepadName = 'No controller detected';
   }
+});
+
+renderer.domElement.addEventListener('mousedown', (event) => {
+  if (document.pointerLockElement !== renderer.domElement) {
+    renderer.domElement.requestPointerLock?.();
+  }
+
+  if (event.button === 0) {
+    state.mouseShootPressed = true;
+  }
+
+  if (event.button === 2) {
+    state.mouseAdsPressed = true;
+  }
+});
+
+window.addEventListener('mouseup', (event) => {
+  if (event.button === 0) {
+    state.mouseShootPressed = false;
+  }
+
+  if (event.button === 2) {
+    state.mouseAdsPressed = false;
+  }
+});
+
+window.addEventListener('mousemove', (event) => {
+  if (document.pointerLockElement !== renderer.domElement) {
+    return;
+  }
+
+  state.pendingMouseLookX += event.movementX;
+  state.pendingMouseLookY += event.movementY;
+});
+
+document.addEventListener('pointerlockchange', () => {
+  if (document.pointerLockElement === renderer.domElement) {
+    return;
+  }
+
+  state.pendingMouseLookX = 0;
+  state.pendingMouseLookY = 0;
+  state.mouseAdsPressed = false;
+});
+
+renderer.domElement.addEventListener('contextmenu', (event) => {
+  event.preventDefault();
 });
 
 window.addEventListener('keydown', (event) => {
@@ -562,6 +646,8 @@ hudElements.resetButton.addEventListener('click', () => {
   state.score = 0;
   state.shots = 0;
   state.hits = 0;
+  state.playerHealth = PLAYER_MAX_HEALTH;
+  state.isGameOver = false;
   state.lastFrameTime = null;
   state.yaw = 0;
   state.pitch = 0;
@@ -571,9 +657,16 @@ hudElements.resetButton.addEventListener('click', () => {
   state.recoilShotIndex = 0;
   state.recoilPatternX = 0;
   state.recoilPatternY = 0;
+  state.pendingMouseLookX = 0;
+  state.pendingMouseLookY = 0;
+  state.mouseShootPressed = false;
+  state.mouseAdsPressed = false;
+  camera.position.set(0, PLAYER_EYE_HEIGHT, 0);
+  previousCameraOrigin.copy(camera.position);
   updateCamera();
   resetTargets();
   clearProjectiles();
+  clearEnemyProjectiles();
 });
 
 hudElements.discoverControllerButton.addEventListener('click', () => {
@@ -587,6 +680,16 @@ bindNumericSetting({
   fallback: DEFAULT_SETTINGS.lookSensitivity,
   onChange: (value) => {
     SETTINGS.lookSensitivity = value;
+  }
+});
+
+bindNumericSetting({
+  id: 'mouse-sensitivity',
+  min: 0.05,
+  max: 1,
+  fallback: DEFAULT_SETTINGS.mouseSensitivity,
+  onChange: (value) => {
+    SETTINGS.mouseSensitivity = value;
   }
 });
 
@@ -833,14 +936,16 @@ function loop(frameTime = 0) {
   state.lastFrameTime = frameTime;
   state.fps = delta > 0 ? (1 / delta) : 0;
   const input = getInputState();
-  const directAimTarget = getDirectAimTarget();
+  const directAimTarget = input.allowAimAssist ? getDirectAimTarget() : null;
 
   updateAimState(delta, input.adsPressed, input.shootPressed);
-  applyLookInput(input.lookX, input.lookY, delta, directAimTarget, input.usingGamepad);
+  applyPlayerMovement(input.moveX, delta);
+  applyLookInput(input.controllerLookX, input.controllerLookY, delta, directAimTarget, input.allowAimAssist);
+  applyMouseLookInput(input.mouseLookX, input.mouseLookY);
   updateCamera();
   updatePlayerVelocity(delta);
-  const firedThisFrame = updateFiring(delta, input.shootPressed);
-  if (!firedThisFrame) {
+  const firedThisFrame = state.isGameOver ? false : updateFiring(delta, input.shootPressed, input.allowAimAssist);
+  if (!firedThisFrame && input.allowAimAssist && !state.isGameOver) {
     applyAimAssist(delta);
   }
   updateCamera();
@@ -848,6 +953,7 @@ function loop(frameTime = 0) {
   updateWeaponTransform();
   updateTargets(delta);
   updateProjectiles(delta);
+  updateEnemyProjectiles(delta);
   updateCrosshair();
   updateHud();
 
@@ -856,11 +962,13 @@ function loop(frameTime = 0) {
 }
 
 function getInputState() {
-  let lookX = 0;
-  let lookY = 0;
-  let shootPressed = keyboard.has('Space');
-  let adsPressed = keyboard.has('ShiftLeft') || keyboard.has('ShiftRight');
+  let controllerLookX = 0;
+  let controllerLookY = 0;
+  let moveX = 0;
+  let shootPressed = keyboard.has('Space') || state.mouseShootPressed;
+  let adsPressed = keyboard.has('ShiftLeft') || keyboard.has('ShiftRight') || state.mouseAdsPressed;
   let usingGamepad = false;
+  const usingMouseAim = document.pointerLockElement === renderer.domElement;
 
   const pad = getActiveGamepad();
   if (pad) {
@@ -868,8 +976,9 @@ function getInputState() {
     state.rawStickX = pad.axes[2] ?? 0;
     state.rawStickY = pad.axes[3] ?? 0;
 
-    lookX = processStickAxis(state.rawStickX);
-    lookY = processStickAxis(state.rawStickY);
+    controllerLookX = processStickAxis(state.rawStickX);
+    controllerLookY = processStickAxis(state.rawStickY);
+    moveX += processStickAxis(pad.axes[0] ?? 0);
     shootPressed = shootPressed || isButtonPressed(pad.buttons[7]) || isButtonPressed(pad.buttons[5]);
     adsPressed = adsPressed || isButtonPressed(pad.buttons[6]) || isButtonPressed(pad.buttons[4]);
   } else {
@@ -877,12 +986,26 @@ function getInputState() {
     state.rawStickY = 0;
   }
 
-  if (keyboard.has('ArrowLeft') || keyboard.has('KeyA')) lookX -= 0.7;
-  if (keyboard.has('ArrowRight') || keyboard.has('KeyD')) lookX += 0.7;
-  if (keyboard.has('ArrowUp') || keyboard.has('KeyW')) lookY -= 0.7;
-  if (keyboard.has('ArrowDown') || keyboard.has('KeyS')) lookY += 0.7;
+  if (keyboard.has('ArrowLeft') || keyboard.has('KeyA')) moveX -= 1;
+  if (keyboard.has('ArrowRight') || keyboard.has('KeyD')) moveX += 1;
 
-  return { lookX, lookY, shootPressed, adsPressed, usingGamepad };
+  const mouseLookX = state.pendingMouseLookX;
+  const mouseLookY = state.pendingMouseLookY;
+  state.pendingMouseLookX = 0;
+  state.pendingMouseLookY = 0;
+
+  return {
+    controllerLookX,
+    controllerLookY,
+    mouseLookX,
+    mouseLookY,
+    moveX: THREE.MathUtils.clamp(moveX, -1, 1),
+    shootPressed,
+    adsPressed,
+    usingGamepad,
+    usingMouseAim,
+    allowAimAssist: usingGamepad && !usingMouseAim
+  };
 }
 
 function discoverController(showHint = false) {
@@ -941,9 +1064,9 @@ function getTargetRoot(object) {
   return object.userData.targetRoot ?? object;
 }
 
-function applyLookInput(lookX, lookY, delta, directAimTarget, usingGamepad) {
+function applyLookInput(lookX, lookY, delta, directAimTarget, usingControllerAim) {
   let sensitivityMultiplier = THREE.MathUtils.lerp(1, SETTINGS.adsSensitivityMultiplier, state.aimBlend);
-  if (usingGamepad && directAimTarget && SETTINGS.aimSlow > 0) {
+  if (usingControllerAim && directAimTarget && SETTINGS.aimSlow > 0) {
     sensitivityMultiplier *= THREE.MathUtils.lerp(1, 0.25, SETTINGS.aimSlow);
   }
 
@@ -952,6 +1075,20 @@ function applyLookInput(lookX, lookY, delta, directAimTarget, usingGamepad) {
 
   state.yaw -= lookX * lookSensitivity * delta;
   state.pitch -= verticalLook * lookSensitivity * delta;
+  state.pitch = THREE.MathUtils.clamp(state.pitch, -0.85, 0.85);
+}
+
+function applyMouseLookInput(mouseLookX, mouseLookY) {
+  if (mouseLookX === 0 && mouseLookY === 0) {
+    return;
+  }
+
+  const sensitivityMultiplier = THREE.MathUtils.lerp(1, SETTINGS.adsSensitivityMultiplier, state.aimBlend);
+  const lookSensitivity = SETTINGS.mouseSensitivity * sensitivityMultiplier * 0.0025;
+  const verticalLook = SETTINGS.invertY ? -mouseLookY : mouseLookY;
+
+  state.yaw -= mouseLookX * lookSensitivity;
+  state.pitch -= verticalLook * lookSensitivity;
   state.pitch = THREE.MathUtils.clamp(state.pitch, -0.85, 0.85);
 }
 
@@ -991,6 +1128,16 @@ function isAdsSnapActive() {
   return state.isAimingDownSights && state.aimBlend <= 0.9;
 }
 
+function applyPlayerMovement(moveX, delta) {
+  if (moveX === 0 || state.isGameOver) {
+    return;
+  }
+
+  const strafeDirection = new THREE.Vector3(1, 0, 0).applyAxisAngle(PROJECTILE_UP_AXIS, state.yaw).normalize();
+  camera.position.addScaledVector(strafeDirection, moveX * PLAYER_STRAFE_SPEED * delta);
+  camera.position.y = PLAYER_EYE_HEIGHT;
+}
+
 function updateCamera() {
   camera.rotation.order = 'YXZ';
   camera.rotation.y = state.yaw;
@@ -1007,7 +1154,7 @@ function getAdsFov() {
   return THREE.MathUtils.clamp(SETTINGS.fov * SETTINGS.adsFovMultiplier, 35, SETTINGS.fov);
 }
 
-function updateFiring(delta, shootPressed) {
+function updateFiring(delta, shootPressed, allowAimAssist) {
   state.fireCooldown = Math.max(0, state.fireCooldown - delta);
 
   if (!shootPressed) {
@@ -1020,7 +1167,7 @@ function updateFiring(delta, shootPressed) {
   let firedShots = 0;
 
   while (state.fireCooldown <= 0 && remainingShots > 0) {
-    fireShot(delta);
+    fireShot(delta, allowAimAssist);
     state.fireCooldown += shotInterval;
     remainingShots -= 1;
     firedShots += 1;
@@ -1029,7 +1176,7 @@ function updateFiring(delta, shootPressed) {
   return firedShots > 0;
 }
 
-function fireShot(delta) {
+function fireShot(delta, allowAimAssist) {
   state.shots += 1;
 
   const recoilPoint = getRecoilPoint(state.recoilShotIndex);
@@ -1048,12 +1195,13 @@ function fireShot(delta) {
     0,
     2
   );
+  if (allowAimAssist) {
+    applyAimAssist(delta);
+  }
   applyAimRecoil(recoilPoint);
   updateCamera();
-  applyAimAssist(delta);
-  updateCamera();
 
-  const shotDirection = getShotDirection(shotOffset);
+  const shotDirection = getShotDirection(shotOffset, allowAimAssist);
   raycaster.set(getCameraOrigin(), shotDirection);
   const intersections = raycaster.intersectObjects(targets, true);
   const hitPoint = intersections[0]?.point ?? getMissPoint();
@@ -1070,11 +1218,11 @@ function getMissPoint() {
   return raycaster.ray.origin.clone().add(raycaster.ray.direction.clone().multiplyScalar(SETTINGS.projectileMaxDistance));
 }
 
-function getShotDirection(shotOffset) {
+function getShotDirection(shotOffset, allowAimAssist) {
   raycaster.setFromCamera(shotOffset, camera);
   const baseDirection = raycaster.ray.direction.clone();
 
-  if (SETTINGS.bulletMagnetism <= 0) {
+  if (!allowAimAssist || SETTINGS.bulletMagnetism <= 0) {
     return baseDirection;
   }
 
@@ -1196,11 +1344,102 @@ function updateProjectiles(delta) {
   }
 }
 
+function fireTargetProjectile(target) {
+  const start = target.localToWorld(target.userData.head.position.clone());
+  const aimedPoint = getCameraOrigin();
+  const toTargetPoint = aimedPoint.clone().sub(start);
+  const distance = toTargetPoint.length();
+
+  if (distance <= 0.0001) {
+    return;
+  }
+
+  const mesh = new THREE.Mesh(projectileGeometry, enemyProjectileMaterial);
+  const direction = toTargetPoint.normalize();
+  mesh.position.copy(start);
+  mesh.quaternion.setFromUnitVectors(PROJECTILE_UP_AXIS, direction);
+  scene.add(mesh);
+
+  enemyProjectiles.push({
+    mesh,
+    start,
+    end: aimedPoint,
+    direction,
+    distance,
+    previousHead: start.clone(),
+    trailLength: Math.min(Math.max(distance * 0.3, 1.5), 4.5),
+    progress: 0,
+    duration: Math.max(distance / TARGET_PROJECTILE_SPEED, 0.04)
+  });
+}
+
+function updateEnemyProjectiles(delta) {
+  const playerPoint = getCameraOrigin();
+
+  for (let index = enemyProjectiles.length - 1; index >= 0; index -= 1) {
+    const projectile = enemyProjectiles[index];
+    projectile.progress += delta / projectile.duration;
+
+    const clampedProgress = Math.min(projectile.progress, 1);
+    const headDistance = projectile.distance * clampedProgress;
+    const tailDistance = Math.max(0, headDistance - projectile.trailLength);
+    const head = projectile.start.clone().addScaledVector(projectile.direction, headDistance);
+    const tail = projectile.start.clone().addScaledVector(projectile.direction, tailDistance);
+    const segment = head.clone().sub(tail);
+    const segmentLength = Math.max(segment.length(), 0.001);
+    const midpoint = tail.clone().addScaledVector(segment, 0.5);
+
+    projectile.mesh.position.copy(midpoint);
+    projectile.mesh.quaternion.setFromUnitVectors(PROJECTILE_UP_AXIS, projectile.direction);
+    projectile.mesh.scale.set(1, segmentLength, 1);
+
+    if (getDistanceToSegment(playerPoint, projectile.previousHead, head) <= TARGET_PROJECTILE_HIT_RADIUS) {
+      applyDamageToPlayer(TARGET_PROJECTILE_DAMAGE);
+      scene.remove(projectile.mesh);
+      enemyProjectiles.splice(index, 1);
+      continue;
+    }
+
+    projectile.previousHead.copy(head);
+
+    if (projectile.progress >= 1) {
+      scene.remove(projectile.mesh);
+      enemyProjectiles.splice(index, 1);
+    }
+  }
+}
+
 function clearProjectiles() {
   for (const projectile of projectiles) {
     scene.remove(projectile.mesh);
   }
   projectiles.length = 0;
+}
+
+function clearEnemyProjectiles() {
+  for (const projectile of enemyProjectiles) {
+    scene.remove(projectile.mesh);
+  }
+  enemyProjectiles.length = 0;
+}
+
+function applyDamageToPlayer(amount) {
+  if (state.isGameOver) {
+    return;
+  }
+
+  state.playerHealth = Math.max(0, state.playerHealth - amount);
+  if (state.playerHealth > 0) {
+    return;
+  }
+
+  state.isGameOver = true;
+  state.mouseShootPressed = false;
+  state.mouseAdsPressed = false;
+
+  if (document.pointerLockElement === renderer.domElement) {
+    document.exitPointerLock?.();
+  }
 }
 
 function createTarget() {
@@ -1233,6 +1472,7 @@ function createTarget() {
   target.userData.bodyHeightScale = 1.45;
   target.userData.feetClearance = 0.04;
   target.userData.verticalOscillationPhase = 0;
+  target.userData.fireCooldown = 0;
   target.userData.material = material;
   target.userData.totalHeight = TARGET_BODY_BASE_HEIGHT + TARGET_HEAD_RADIUS * 2;
 
@@ -1280,6 +1520,7 @@ function respawnTarget(target) {
   target.userData.age = 0;
   target.userData.lifetime = randomRange(SETTINGS.targetLifetimeMin, SETTINGS.targetLifetimeMax);
   target.userData.verticalOscillationPhase = randomRange(0, Math.PI * 2);
+  target.userData.fireCooldown = randomRange(TARGET_FIRE_INTERVAL_MIN, TARGET_FIRE_INTERVAL_MAX);
   target.userData.health = target.userData.maxHealth;
   target.userData.widthScale = randomRange(0.92, 1.12);
   target.userData.bodyHeightScale = randomRange(1.2, 1.55);
@@ -1344,9 +1585,15 @@ function applyTargetHealthVisuals(target) {
 function updateTargets(delta) {
   for (const target of targets) {
     target.userData.age += delta;
+    target.userData.fireCooldown = Math.max(0, target.userData.fireCooldown - delta);
     target.userData.basePosition.addScaledVector(target.userData.horizontalVelocity, delta);
     target.userData.basePosition.y = Math.max(target.userData.basePosition.y, target.userData.feetClearance);
     updateTargetPosition(target);
+
+    if (!state.isGameOver && target.userData.fireCooldown <= 0) {
+      fireTargetProjectile(target);
+      target.userData.fireCooldown = randomRange(TARGET_FIRE_INTERVAL_MIN, TARGET_FIRE_INTERVAL_MAX);
+    }
 
     if (target.userData.age >= target.userData.lifetime) {
       respawnTarget(target);
@@ -1582,10 +1829,12 @@ function updateHud() {
 
   hudElements.gamepadStatus.textContent = `Controller: ${state.gamepadName}`;
   hudElements.framerate.textContent = `FPS: ${Math.round(state.fps)}`;
+  hudElements.health.textContent = `Health: ${state.playerHealth}`;
   hudElements.accuracy.textContent = `Accuracy: ${accuracy}%`;
   hudElements.hits.textContent = `Hits: ${state.hits}`;
   hudElements.misses.textContent = `Misses: ${misses}`;
   hudElements.score.textContent = `Score: ${state.score}`;
+  hudElements.status.textContent = state.isGameOver ? 'Status: LOST - press Restart' : 'Status: READY';
   hudElements.rawStick.textContent = `Raw stick: X ${state.rawStickX.toFixed(2)} | Y ${state.rawStickY.toFixed(2)}`;
 }
 
@@ -1958,6 +2207,7 @@ function sanitizeGameSettings(rawSettings) {
 
   return {
     lookSensitivity: clampSetting(rawSettings.lookSensitivity, 1, 10, DEFAULT_SETTINGS.lookSensitivity),
+    mouseSensitivity: clampSetting(rawSettings.mouseSensitivity, 0.05, 1, DEFAULT_SETTINGS.mouseSensitivity),
     deadzone: clampSetting(rawSettings.deadzone, 0, 0.35, DEFAULT_SETTINGS.deadzone),
     invertY: typeof rawSettings.invertY === 'boolean' ? rawSettings.invertY : DEFAULT_SETTINGS.invertY,
     fov: clampSetting(rawSettings.fov, 50, 110, DEFAULT_SETTINGS.fov),
@@ -1970,7 +2220,7 @@ function sanitizeGameSettings(rawSettings) {
       typeof rawSettings.showDebugShapes === 'boolean' ? rawSettings.showDebugShapes : DEFAULT_SETTINGS.showDebugShapes,
     targetHorizontalSpeedMin: clampSetting(targetHorizontalSpeedMin, 0.1, 5, DEFAULT_SETTINGS.targetHorizontalSpeedMin),
     targetHorizontalSpeedMax: clampSetting(targetHorizontalSpeedMax, 0.1, 5, DEFAULT_SETTINGS.targetHorizontalSpeedMax),
-    targetCount: clampSetting(rawSettings.targetCount, 1, 32, DEFAULT_SETTINGS.targetCount),
+    targetCount: clampSetting(rawSettings.targetCount, 1, 3, DEFAULT_SETTINGS.targetCount),
     targetRadius: clampSetting(rawSettings.targetRadius, 0.1, 2, DEFAULT_SETTINGS.targetRadius),
     targetMaxHealth: clampSetting(rawSettings.targetMaxHealth, 1, 100, DEFAULT_SETTINGS.targetMaxHealth),
     targetSpawnYVariance: clampSetting(rawSettings.targetSpawnYVariance, 0, 3, DEFAULT_SETTINGS.targetSpawnYVariance),
@@ -2165,6 +2415,7 @@ function syncProfileSelectors() {
 
 function syncSettingControls() {
   setNumericControlValue('sensitivity', SETTINGS.lookSensitivity);
+  setNumericControlValue('mouse-sensitivity', SETTINGS.mouseSensitivity);
   setNumericControlValue('deadzone', SETTINGS.deadzone);
   setNumericControlValue('fov', SETTINGS.fov);
   setNumericControlValue('fps-max', SETTINGS.fpsMax);
@@ -2360,6 +2611,18 @@ function getYawToPoint(origin, point) {
 
 function getShortestAngleDelta(fromAngle, toAngle) {
   return Math.atan2(Math.sin(toAngle - fromAngle), Math.cos(toAngle - fromAngle));
+}
+
+function getDistanceToSegment(point, start, end) {
+  const segment = end.clone().sub(start);
+  const lengthSq = segment.lengthSq();
+  if (lengthSq <= 0.000001) {
+    return point.distanceTo(start);
+  }
+
+  const projection = THREE.MathUtils.clamp(point.clone().sub(start).dot(segment) / lengthSq, 0, 1);
+  const closestPoint = start.clone().addScaledVector(segment, projection);
+  return point.distanceTo(closestPoint);
 }
 
 function getTriangleWave(value) {
