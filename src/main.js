@@ -49,6 +49,7 @@ const GAME_SETTING_KEYS = [
   'deadzone',
   'invertY',
   'fov',
+  'fpsMax',
   'responseCurve',
   'aimSlow',
   'aimStickiness',
@@ -93,6 +94,7 @@ const DEFAULT_SETTINGS = {
   deadzone: 0.12,
   invertY: false,
   fov: 110,
+  fpsMax: 0,
   responseCurve: 'linear',
   projectileRate: 14,
   bulletMagnetism: 0,
@@ -138,6 +140,7 @@ const state = {
   shots: 0,
   hits: 0,
   fps: 0,
+  lastFrameTime: null,
   activeGamepadIndex: null,
   gamepadName: 'No controller detected',
   yaw: 0,
@@ -245,6 +248,14 @@ app.innerHTML = `
       max: 110,
       step: 1,
       value: SETTINGS.fov
+    })}
+    ${renderNumericControl({
+      id: 'fps-max',
+      label: 'FPS maximum (0 = uncapped)',
+      min: 0,
+      max: 240,
+      step: 1,
+      value: SETTINGS.fpsMax
     })}
     ${renderNumericControl({
       id: 'aim-slow',
@@ -491,7 +502,6 @@ for (let index = 0; index < SETTINGS.targetCount; index += 1) {
 
 const raycaster = new THREE.Raycaster();
 const keyboard = new Set();
-const clock = new THREE.Clock();
 const hudElements = {
   gamepadStatus: document.querySelector('#gamepad-status'),
   framerate: document.querySelector('#framerate'),
@@ -552,6 +562,7 @@ hudElements.resetButton.addEventListener('click', () => {
   state.score = 0;
   state.shots = 0;
   state.hits = 0;
+  state.lastFrameTime = null;
   state.yaw = 0;
   state.pitch = 0;
   state.spreadKick = 0;
@@ -596,6 +607,16 @@ bindNumericSetting({
   fallback: DEFAULT_SETTINGS.fov,
   onChange: (value) => {
     SETTINGS.fov = value;
+  }
+});
+
+bindNumericSetting({
+  id: 'fps-max',
+  min: 0,
+  max: 240,
+  fallback: DEFAULT_SETTINGS.fpsMax,
+  onChange: (value) => {
+    SETTINGS.fpsMax = value;
   }
 });
 
@@ -793,8 +814,23 @@ hudElements.gunProfileSelect.addEventListener('change', (event) => {
 
 initializePanelToggles();
 
-function loop() {
-  const delta = clock.getDelta();
+function loop(frameTime = 0) {
+  if (state.lastFrameTime === null) {
+    state.lastFrameTime = frameTime;
+    requestAnimationFrame(loop);
+    return;
+  }
+
+  const frameInterval = SETTINGS.fpsMax > 0 ? 1000 / SETTINGS.fpsMax : 0;
+  const elapsedMs = frameTime - state.lastFrameTime;
+
+  if (frameInterval > 0 && elapsedMs < frameInterval) {
+    requestAnimationFrame(loop);
+    return;
+  }
+
+  const delta = Math.min(Math.max(elapsedMs, 0) / 1000, 0.1);
+  state.lastFrameTime = frameTime;
   state.fps = delta > 0 ? (1 / delta) : 0;
   const input = getInputState();
   const directAimTarget = getDirectAimTarget();
@@ -1925,6 +1961,7 @@ function sanitizeGameSettings(rawSettings) {
     deadzone: clampSetting(rawSettings.deadzone, 0, 0.35, DEFAULT_SETTINGS.deadzone),
     invertY: typeof rawSettings.invertY === 'boolean' ? rawSettings.invertY : DEFAULT_SETTINGS.invertY,
     fov: clampSetting(rawSettings.fov, 50, 110, DEFAULT_SETTINGS.fov),
+    fpsMax: clampSetting(rawSettings.fpsMax, 0, 240, DEFAULT_SETTINGS.fpsMax),
     responseCurve: sanitizeResponseCurve(rawSettings.responseCurve),
     aimSlow: clampSetting(rawSettings.aimSlow, 0, 1, DEFAULT_SETTINGS.aimSlow),
     aimStickiness: clampSetting(rawSettings.aimStickiness, 0, 1, DEFAULT_SETTINGS.aimStickiness),
@@ -2130,6 +2167,7 @@ function syncSettingControls() {
   setNumericControlValue('sensitivity', SETTINGS.lookSensitivity);
   setNumericControlValue('deadzone', SETTINGS.deadzone);
   setNumericControlValue('fov', SETTINGS.fov);
+  setNumericControlValue('fps-max', SETTINGS.fpsMax);
   setNumericControlValue('projectile-rate', SETTINGS.projectileRate);
   setNumericControlValue('bullet-magnetism', SETTINGS.bulletMagnetism);
   setNumericControlValue('aim-slow', SETTINGS.aimSlow);
