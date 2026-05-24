@@ -20,6 +20,10 @@ const LOW_HEALTH_COLOR = new THREE.Color(0xff4d6d);
 const FULL_HEALTH_EMISSIVE = new THREE.Color(0x07150d);
 const LOW_HEALTH_EMISSIVE = new THREE.Color(0x2a050a);
 const PROJECTILE_UP_AXIS = new THREE.Vector3(0, 1, 0);
+const WORLD_UP_AXIS = new THREE.Vector3(0, 1, 0);
+const TARGET_BODY_BASE_HEIGHT = 0.96;
+const TARGET_HEAD_RADIUS = 0.18;
+const TARGET_DEPTH_SCALE = 0.45;
 
 const DEFAULT_SETTINGS = {
   lookSensitivity: 2.8,
@@ -87,7 +91,7 @@ app.innerHTML = `
       aria-expanded="true"
       aria-label="Collapse Controller Aim Trainer panel"
     >
-      <span aria-hidden="true">‹</span>
+      <span aria-hidden="true">˅</span>
     </button>
     <strong>Controller Aim Trainer</strong>
     <div id="gamepad-status">Controller: ${state.gamepadName}</div>
@@ -114,7 +118,7 @@ app.innerHTML = `
       aria-expanded="true"
       aria-label="Collapse Controller settings panel"
     >
-      <span aria-hidden="true">›</span>
+      <span aria-hidden="true">˅</span>
     </button>
     <strong>Controller settings</strong>
     ${renderNumericControl({
@@ -190,7 +194,7 @@ app.innerHTML = `
       aria-expanded="true"
       aria-label="Collapse Controls panel"
     >
-      <span aria-hidden="true">‹</span>
+      <span aria-hidden="true">˅</span>
     </button>
     <div><strong>Controls</strong></div>
     <div>Right stick: aim</div>
@@ -213,7 +217,7 @@ app.prepend(renderer.domElement);
 
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(0x0b1020);
-scene.fog = new THREE.Fog(0x0b1020, 18, 40);
+scene.fog = new THREE.Fog(0x0b1020, 36, 110);
 
 const camera = new THREE.PerspectiveCamera(SETTINGS.fov, window.innerWidth / window.innerHeight, 0.1, 100);
 camera.position.set(0, 1.7, 0);
@@ -228,19 +232,19 @@ directionalLight.castShadow = true;
 scene.add(directionalLight);
 
 const floor = new THREE.Mesh(
-  new THREE.PlaneGeometry(48, 100),
+  new THREE.PlaneGeometry(64, 180),
   new THREE.MeshStandardMaterial({ color: 0x1c2438, roughness: 0.75 })
 );
 floor.rotation.x = -Math.PI / 2;
-floor.position.z = -34;
+floor.position.z = -64;
 floor.receiveShadow = true;
 scene.add(floor);
 
 const backWall = new THREE.Mesh(
-  new THREE.PlaneGeometry(28, 12),
+  new THREE.PlaneGeometry(56, 22),
   new THREE.MeshStandardMaterial({ color: 0x182039, roughness: 0.8 })
 );
-backWall.position.set(0, 6, -40);
+backWall.position.set(0, 11, -88);
 backWall.receiveShadow = true;
 scene.add(backWall);
 
@@ -249,8 +253,8 @@ camera.add(weapon);
 
 const targets = [];
 const projectiles = [];
-const targetBodyGeometry = new THREE.BoxGeometry(0.34, 1.18, 0.16);
-const targetHeadGeometry = new THREE.SphereGeometry(0.17, 24, 24);
+const targetBodyGeometry = new THREE.BoxGeometry(0.36, TARGET_BODY_BASE_HEIGHT, 0.16);
+const targetHeadGeometry = new THREE.SphereGeometry(TARGET_HEAD_RADIUS, 24, 24);
 const projectileGeometry = new THREE.CylinderGeometry(0.025, 0.025, 1, 10);
 const projectileMaterial = new THREE.MeshStandardMaterial({
   color: 0xfff2b6,
@@ -318,6 +322,7 @@ window.addEventListener('resize', () => {
   camera.aspect = window.innerWidth / window.innerHeight;
   camera.updateProjectionMatrix();
   renderer.setSize(window.innerWidth, window.innerHeight);
+  updatePanelCollapseDistances();
 });
 
 document.querySelector('#reset-button').addEventListener('click', () => {
@@ -722,8 +727,6 @@ function createTarget() {
   const body = new THREE.Mesh(targetBodyGeometry, material);
   const head = new THREE.Mesh(targetHeadGeometry, material);
 
-  body.position.y = 0.59;
-  head.position.y = 1.39;
   body.castShadow = true;
   head.castShadow = true;
   body.userData.targetRoot = target;
@@ -736,10 +739,13 @@ function createTarget() {
   target.userData.horizontalVelocity = new THREE.Vector3();
   target.userData.age = 0;
   target.userData.lifetime = SETTINGS.targetLifetimeMax;
-  target.userData.widthScale = 0.5;
-  target.userData.heightScale = 2.1;
+  target.userData.body = body;
+  target.userData.head = head;
+  target.userData.widthScale = 1;
+  target.userData.bodyHeightScale = 1.45;
   target.userData.feetClearance = 0.04;
   target.userData.material = material;
+  target.userData.totalHeight = TARGET_BODY_BASE_HEIGHT + TARGET_HEAD_RADIUS * 2;
 
   return target;
 }
@@ -759,14 +765,21 @@ function applyHitToTarget(target) {
 
 function respawnTarget(target) {
   const distance = randomRange(SETTINGS.spawnDistanceMin, SETTINGS.spawnDistanceMax);
-  const halfHeight = Math.tan(THREE.MathUtils.degToRad(camera.fov / 2)) * distance;
-  const halfWidth = halfHeight * camera.aspect;
-  const localPosition = new THREE.Vector3(
-    randomRange(-halfWidth * 0.55, halfWidth * 0.55),
-    randomRange(-halfHeight * 0.04, halfHeight * 0.3),
-    -distance
-  );
-  const worldPosition = camera.localToWorld(localPosition.clone());
+  const horizontalForward = camera.getWorldDirection(new THREE.Vector3());
+  horizontalForward.y = 0;
+  if (horizontalForward.lengthSq() < 0.0001) {
+    horizontalForward.set(0, 0, -1);
+  } else {
+    horizontalForward.normalize();
+  }
+
+  const horizontalRight = new THREE.Vector3().crossVectors(horizontalForward, WORLD_UP_AXIS).normalize();
+  const halfWidth = Math.tan(THREE.MathUtils.degToRad(camera.fov / 2)) * distance * camera.aspect;
+  const lateralOffset = randomRange(-halfWidth * 0.5, halfWidth * 0.5);
+  const worldPosition = camera.position
+    .clone()
+    .addScaledVector(horizontalForward, distance)
+    .addScaledVector(horizontalRight, lateralOffset);
   const horizontalVelocity = getHorizontalVelocity();
 
   target.userData.basePosition.copy(worldPosition);
@@ -775,16 +788,23 @@ function respawnTarget(target) {
   target.userData.lifetime = randomRange(SETTINGS.targetLifetimeMin, SETTINGS.targetLifetimeMax);
   target.userData.health = target.userData.maxHealth;
   target.userData.rotationSpeed = randomRange(0.8, 1.6);
-  target.userData.widthScale = randomRange(0.38, 0.52);
-  target.userData.heightScale = randomRange(1.9, 2.6);
+  target.userData.widthScale = randomRange(0.92, 1.12);
+  target.userData.bodyHeightScale = randomRange(1.2, 1.55);
+  target.userData.totalHeight =
+    TARGET_BODY_BASE_HEIGHT * target.userData.bodyHeightScale + TARGET_HEAD_RADIUS * 2 * target.userData.widthScale;
 
-  worldPosition.y = Math.max(worldPosition.y, target.userData.feetClearance);
-  target.position.copy(worldPosition);
-  target.scale.set(
+  target.userData.body.scale.set(
     target.userData.widthScale,
-    target.userData.heightScale,
-    target.userData.widthScale
+    target.userData.bodyHeightScale,
+    target.userData.widthScale * TARGET_DEPTH_SCALE
   );
+  target.userData.body.position.y = (TARGET_BODY_BASE_HEIGHT * target.userData.bodyHeightScale) / 2;
+  target.userData.head.scale.setScalar(target.userData.widthScale);
+  target.userData.head.position.y =
+    TARGET_BODY_BASE_HEIGHT * target.userData.bodyHeightScale + TARGET_HEAD_RADIUS * target.userData.widthScale;
+
+  worldPosition.y = randomRange(target.userData.feetClearance, 0.85);
+  target.position.copy(worldPosition);
 
   applyTargetHealthVisuals(target);
 }
@@ -869,15 +889,15 @@ function createWeaponModel() {
 
 function updateWeaponTransform() {
   weapon.position.set(
-    THREE.MathUtils.lerp(0.34, 0, state.aimBlend) + state.recoilPatternX * 0.01 * (1 - state.aimBlend * 0.85),
-    THREE.MathUtils.lerp(-0.28, -0.08, state.aimBlend) - state.weaponKick * 0.025 - state.recoilPatternY * 0.008,
-    THREE.MathUtils.lerp(-0.6, -0.34, state.aimBlend) + state.weaponKick * 0.05
+    THREE.MathUtils.lerp(0.24, 0, state.aimBlend) + state.recoilPatternX * 0.01 * (1 - state.aimBlend * 0.85),
+    THREE.MathUtils.lerp(-0.2, -0.08, state.aimBlend) - state.weaponKick * 0.025 - state.recoilPatternY * 0.008,
+    THREE.MathUtils.lerp(-0.46, -0.34, state.aimBlend) + state.weaponKick * 0.05
   );
 
   weapon.rotation.set(
-    THREE.MathUtils.lerp(-0.18, 0, state.aimBlend) + state.weaponKick * 0.14 + state.recoilPatternY * 0.06,
-    THREE.MathUtils.lerp(-0.34, 0, state.aimBlend),
-    THREE.MathUtils.lerp(-0.08, 0, state.aimBlend) - state.recoilPatternX * 0.09 * (1 - state.aimBlend * 0.85)
+    THREE.MathUtils.lerp(-0.06, 0, state.aimBlend) + state.weaponKick * 0.14 + state.recoilPatternY * 0.06,
+    THREE.MathUtils.lerp(-0.12, 0, state.aimBlend),
+    THREE.MathUtils.lerp(-0.02, 0, state.aimBlend) - state.recoilPatternX * 0.09 * (1 - state.aimBlend * 0.85)
   );
 }
 
@@ -931,19 +951,28 @@ function initializePanelToggles() {
     const toggle = panel.querySelector('.panel-toggle');
     toggle.addEventListener('click', () => {
       const collapsed = panel.classList.toggle('is-collapsed');
-      const side = panel.dataset.side;
       toggle.setAttribute('aria-expanded', String(!collapsed));
-      toggle.querySelector('span').textContent = getPanelToggleSymbol(side, collapsed);
+      toggle.querySelector('span').textContent = getPanelToggleSymbol(collapsed);
+      updatePanelCollapseDistances();
     });
+  }
+
+  updatePanelCollapseDistances();
+}
+
+function updatePanelCollapseDistances() {
+  const panels = [hudElements.hudPanel, hudElements.settingsPanel, hudElements.controlsPanel];
+  const visibleTabHeight = 46;
+
+  for (const panel of panels) {
+    const panelRect = panel.getBoundingClientRect();
+    const collapseDistance = Math.max(0, window.innerHeight - visibleTabHeight - panelRect.top);
+    panel.style.setProperty('--collapse-distance', `${collapseDistance}px`);
   }
 }
 
-function getPanelToggleSymbol(side, collapsed) {
-  if (side === 'right') {
-    return collapsed ? '‹' : '›';
-  }
-
-  return collapsed ? '›' : '‹';
+function getPanelToggleSymbol(collapsed) {
+  return collapsed ? '˄' : '˅';
 }
 
 function renderNumericControl({ id, label, min, max, step, value }) {
