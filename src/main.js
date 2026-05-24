@@ -676,6 +676,10 @@ function applyAimRecoil(recoilPoint) {
 }
 
 function getShotOffset(recoilPoint) {
+  if (state.isAimingDownSights) {
+    return new THREE.Vector2(0, 0);
+  }
+
   const randomOffset = getRandomSpreadOffset();
   const recoilScale = THREE.MathUtils.lerp(0.0042, 0.0019, state.aimBlend);
 
