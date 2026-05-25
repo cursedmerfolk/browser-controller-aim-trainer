@@ -18,6 +18,7 @@ export function renderSettingsPanelMarkup({ settings, profileController }) {
         ${renderAccordionSection({
           id: 'game-profile-settings-section',
           title: 'Game profile + settings',
+          collapsed: true,
           content: `
             ${renderProfileSelect({
               id: 'game-profile-select',
@@ -93,6 +94,7 @@ export function renderSettingsPanelMarkup({ settings, profileController }) {
         ${renderAccordionSection({
           id: 'gun-profile-settings-section',
           title: 'Gun profile + settings',
+          collapsed: true,
           content: `
             ${renderProfileSelect({
               id: 'gun-profile-select',

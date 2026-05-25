@@ -334,6 +334,11 @@ gap: 6px;
   gap: 10px;
 }
 
+.controls-note {
+  font-size: 12px;
+  opacity: 0.82;
+}
+
 .button-row {
   display: flex;
   flex-wrap: wrap;
