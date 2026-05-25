@@ -9,6 +9,8 @@ import {
 } from '../config/constants.js';
 import { getTriangleWave, randomRange } from '../utils/math.js';
 
+const TARGET_FEET_CLEARANCE = 0.04;
+
 export function createTargetSystem({ scene, camera, backWall, state, settings, playHitTickSound }) {
   const targets = [];
   const targetBodyGeometry = new THREE.BoxGeometry(0.36, TARGET_BODY_BASE_HEIGHT, 0.36);
@@ -59,13 +61,11 @@ export function createTargetSystem({ scene, camera, backWall, state, settings, p
     target.userData.head = head;
     target.userData.fireIntervalScale = settings.targetFireIntervalScaleMin;
     target.userData.strafePhase = 0;
-    target.userData.widthScale = 1;
-    target.userData.bodyHeightScale = 1.45;
-    target.userData.feetClearance = 0.04;
+    target.userData.feetClearance = TARGET_FEET_CLEARANCE;
     target.userData.verticalOscillationPhase = 0;
     target.userData.fireCooldown = 0;
     target.userData.material = material;
-    target.userData.totalHeight = TARGET_BODY_BASE_HEIGHT + TARGET_HEAD_RADIUS * 2;
+    target.userData.totalHeight = settings.targetHeight + settings.targetWidth;
 
     return target;
   }
@@ -86,25 +86,20 @@ export function createTargetSystem({ scene, camera, backWall, state, settings, p
   }
 
   function respawnTarget(target) {
-    const distance = randomRange(settings.spawnDistanceMin, settings.spawnDistanceMax);
-    const spawnBoxHalfWidth = (backWall.geometry.parameters.width * settings.targetSpawnWidthFactor) / 2;
-    const spawnBoxCenterX = camera.position.x;
+    const spawnBounds = getSpawnBounds();
     const worldPosition = new THREE.Vector3(
-      randomRange(spawnBoxCenterX - spawnBoxHalfWidth, spawnBoxCenterX + spawnBoxHalfWidth),
-      camera.position.y,
-      camera.position.z - distance
+      randomRange(spawnBounds.minX, spawnBounds.maxX),
+      spawnBounds.minY,
+      randomRange(spawnBounds.minZ, spawnBounds.maxZ)
     );
     if (Math.random() < settings.targetGroundSpawnChance) {
-      worldPosition.y = target.userData.feetClearance;
+      worldPosition.y = spawnBounds.minY;
     } else {
-      worldPosition.y = randomRange(
-        target.userData.feetClearance,
-        target.userData.feetClearance + settings.targetSpawnYVariance
-      );
+      worldPosition.y = randomRange(spawnBounds.minY, spawnBounds.maxY);
     }
 
     const moveSpeed = getRandomTargetMoveSpeed();
-    const horizontalVelocity = getHorizontalVelocity(moveSpeed, worldPosition.x, spawnBoxCenterX);
+    const horizontalVelocity = getHorizontalVelocity(moveSpeed, worldPosition.x, (spawnBounds.minX + spawnBounds.maxX) / 2);
 
     target.userData.basePosition.copy(worldPosition);
     target.userData.horizontalVelocity.copy(horizontalVelocity);
@@ -116,20 +111,16 @@ export function createTargetSystem({ scene, camera, backWall, state, settings, p
     target.userData.fireCooldown = getNextTargetFireCooldown(target, true);
     target.userData.strafePhase = randomRange(0, Math.PI * 2);
     target.userData.health = target.userData.maxHealth;
-    target.userData.widthScale = randomRange(0.92, 1.12);
-    target.userData.bodyHeightScale = randomRange(1.2, 1.55);
-    target.userData.totalHeight =
-      TARGET_BODY_BASE_HEIGHT * target.userData.bodyHeightScale + TARGET_HEAD_RADIUS * 2 * target.userData.widthScale;
+    target.userData.totalHeight = settings.targetHeight + settings.targetWidth;
 
-    target.userData.body.scale.set(
-      target.userData.widthScale,
-      target.userData.bodyHeightScale,
-      target.userData.widthScale
-    );
-    target.userData.body.position.y = (TARGET_BODY_BASE_HEIGHT * target.userData.bodyHeightScale) / 2;
-    target.userData.head.scale.setScalar(target.userData.widthScale);
-    target.userData.head.position.y =
-      TARGET_BODY_BASE_HEIGHT * target.userData.bodyHeightScale + TARGET_HEAD_RADIUS * target.userData.widthScale;
+    const bodyWidthScale = settings.targetWidth / 0.36;
+    const bodyHeightScale = settings.targetHeight / TARGET_BODY_BASE_HEIGHT;
+    const headScale = settings.targetWidth / (TARGET_HEAD_RADIUS * 2);
+
+    target.userData.body.scale.set(bodyWidthScale, bodyHeightScale, bodyWidthScale);
+    target.userData.body.position.y = settings.targetHeight / 2;
+    target.userData.head.scale.setScalar(headScale);
+    target.userData.head.position.y = settings.targetHeight + (TARGET_HEAD_RADIUS * 2 * headScale) / 2;
 
     updateTargetPosition(target);
     applyTargetHealthVisuals(target);
@@ -137,6 +128,19 @@ export function createTargetSystem({ scene, camera, backWall, state, settings, p
 
   function getRandomTargetMoveSpeed() {
     return randomRange(settings.targetHorizontalSpeedMin, settings.targetHorizontalSpeedMax);
+  }
+
+  function getSpawnBounds() {
+    const spawnBoxHalfWidth = (backWall.geometry.parameters.width * settings.targetSpawnWidthFactor) / 2;
+    const spawnBoxCenterX = camera.position.x;
+    return {
+      minX: spawnBoxCenterX - spawnBoxHalfWidth,
+      maxX: spawnBoxCenterX + spawnBoxHalfWidth,
+      minY: TARGET_FEET_CLEARANCE,
+      maxY: TARGET_FEET_CLEARANCE + settings.targetSpawnYVariance,
+      minZ: camera.position.z - settings.spawnDistanceMax,
+      maxZ: camera.position.z - settings.spawnDistanceMin
+    };
   }
 
   function getHorizontalVelocity(moveSpeed, spawnX, centerX) {
@@ -219,6 +223,7 @@ export function createTargetSystem({ scene, camera, backWall, state, settings, p
     setFireTargetProjectile,
     getTargetRoot,
     applyHitToTarget,
+    getSpawnBounds,
     resetTargets,
     updateTargets
   };

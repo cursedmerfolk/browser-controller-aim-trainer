@@ -34,7 +34,7 @@ export function createCombatSystem({
     roughness: 0.25
   });
 
-  function updateFiring(delta, shootPressed, allowAimAssist) {
+  function updateFiring(delta, shootPressed) {
     state.fireCooldown = Math.max(0, state.fireCooldown - delta);
 
     if (!shootPressed) {
@@ -47,7 +47,7 @@ export function createCombatSystem({
     let firedShots = 0;
 
     while (state.fireCooldown <= 0 && remainingShots > 0) {
-      fireShot(allowAimAssist);
+      fireShot();
       state.fireCooldown += shotInterval;
       remainingShots -= 1;
       firedShots += 1;
@@ -56,7 +56,7 @@ export function createCombatSystem({
     return firedShots > 0;
   }
 
-  function fireShot(allowAimAssist) {
+  function fireShot() {
     state.shots += 1;
     state.hasPlayerFiredShot = true;
 
@@ -79,11 +79,11 @@ export function createCombatSystem({
     applyAimRecoil(recoilPoint);
     updateCamera();
 
-    const shotDirection = getShotDirection(shotOffset, allowAimAssist);
+    const shotDirection = getShotDirection(shotOffset);
     const shotOrigin = getCameraOrigin();
     raycaster.set(shotOrigin, shotDirection);
     const intersections = raycaster.intersectObjects(targets, true);
-    const magnetismRaycastHit = intersections[0] ? null : getMagnetismRaycastHit(shotOrigin, shotDirection, allowAimAssist);
+    const magnetismRaycastHit = intersections[0] ? null : getMagnetismRaycastHit(shotOrigin, shotDirection);
     const hitPoint = intersections[0]?.point ?? magnetismRaycastHit?.hitPoint ?? getMissPoint();
 
     if (intersections.length > 0) {
@@ -100,11 +100,11 @@ export function createCombatSystem({
     return raycaster.ray.origin.clone().add(raycaster.ray.direction.clone().multiplyScalar(settings.projectileMaxDistance));
   }
 
-  function getShotDirection(shotOffset, allowAimAssist) {
+  function getShotDirection(shotOffset) {
     raycaster.setFromCamera(shotOffset, camera);
     const baseDirection = raycaster.ray.direction.clone();
 
-    if (!allowAimAssist || settings.bulletMagnetism <= 0) {
+    if (settings.bulletMagnetism <= 0) {
       return baseDirection;
     }
 
@@ -121,9 +121,8 @@ export function createCombatSystem({
     return baseDirection.addScaledVector(magnetizedDirection, settings.bulletMagnetism).normalize();
   }
 
-  function getMagnetismRaycastHit(origin, direction, allowAimAssist) {
+  function getMagnetismRaycastHit(origin, direction) {
     if (
-      !allowAimAssist ||
       settings.bulletMagnetism <= 0 ||
       settings.bulletMagnetismConeAngle <= 0
     ) {

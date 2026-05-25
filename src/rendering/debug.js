@@ -1,11 +1,13 @@
 import * as THREE from 'three';
 import { DEBUG_VISUAL_OFFSET } from '../config/constants.js';
 
-export function createDebugSystem({ scene, camera, settings, getCameraOrigin, getCameraForward, isAdsSnapActive }) {
-  const group = new THREE.Group();
-  scene.add(group);
+export function createDebugSystem({ scene, camera, settings, getCameraOrigin, getCameraForward, isAdsSnapActive, getSpawnBounds }) {
+  const aimAssistGroup = new THREE.Group();
+  scene.add(aimAssistGroup);
   let magnetismCone;
   let adsSnapCylinder;
+  const spawnBoundsBox = createDebugBox(0x63c7ff);
+  scene.add(spawnBoundsBox);
   let debugGeometryKey = '';
 
   function rebuildDebugGeometryIfNeeded() {
@@ -14,28 +16,70 @@ export function createDebugSystem({ scene, camera, settings, getCameraOrigin, ge
       return;
     }
 
-    group.clear();
+    aimAssistGroup.clear();
     const lineLength = settings.projectileMaxDistance;
     magnetismCone = createDebugCone(THREE.MathUtils.degToRad(settings.bulletMagnetismConeAngle), lineLength, 0xffb347);
     adsSnapCylinder = createDebugCylinder(settings.adsSnapRadius, lineLength, 0xff4d6d);
-    group.add(magnetismCone);
-    group.add(adsSnapCylinder);
+    aimAssistGroup.add(magnetismCone);
+    aimAssistGroup.add(adsSnapCylinder);
     debugGeometryKey = nextKey;
   }
 
   function updateAimAssistDebugVisuals() {
     rebuildDebugGeometryIfNeeded();
     const debugOrigin = getCameraOrigin().addScaledVector(getCameraForward(), DEBUG_VISUAL_OFFSET);
-    group.position.copy(debugOrigin);
-    group.quaternion.copy(camera.getWorldQuaternion(new THREE.Quaternion()));
-    group.visible = settings.showDebugShapes;
+    aimAssistGroup.position.copy(debugOrigin);
+    aimAssistGroup.quaternion.copy(camera.getWorldQuaternion(new THREE.Quaternion()));
+    aimAssistGroup.visible = settings.showDebugShapes;
     magnetismCone.visible = settings.showDebugShapes && settings.bulletMagnetism > 0;
     adsSnapCylinder.visible = settings.showDebugShapes && settings.adsSnap > 0 && isAdsSnapActive();
+
+    const spawnBounds = getSpawnBounds();
+    const sizeX = Math.max(0.001, spawnBounds.maxX - spawnBounds.minX);
+    const sizeY = Math.max(0.001, spawnBounds.maxY - spawnBounds.minY);
+    const sizeZ = Math.max(0.001, spawnBounds.maxZ - spawnBounds.minZ);
+    spawnBoundsBox.visible = settings.showDebugShapes;
+    spawnBoundsBox.position.set(
+      (spawnBounds.minX + spawnBounds.maxX) / 2,
+      (spawnBounds.minY + spawnBounds.maxY) / 2,
+      (spawnBounds.minZ + spawnBounds.maxZ) / 2
+    );
+    spawnBoundsBox.scale.set(sizeX, sizeY, sizeZ);
   }
 
   return {
     updateAimAssistDebugVisuals
   };
+}
+
+function createDebugBox(color) {
+  const boxGroup = new THREE.Group();
+  const surface = new THREE.Mesh(
+    new THREE.BoxGeometry(1, 1, 1),
+    new THREE.MeshBasicMaterial({
+      color,
+      transparent: true,
+      opacity: 0.08,
+      depthWrite: false,
+      depthTest: false,
+      side: THREE.DoubleSide
+    })
+  );
+  surface.renderOrder = 9;
+  boxGroup.add(surface);
+
+  const edges = new THREE.LineSegments(
+    new THREE.EdgesGeometry(new THREE.BoxGeometry(1, 1, 1)),
+    new THREE.LineBasicMaterial({
+      color,
+      transparent: true,
+      opacity: 0.95,
+      depthTest: false
+    })
+  );
+  edges.renderOrder = 12;
+  boxGroup.add(edges);
+  return boxGroup;
 }
 
 function createDebugLine(color, length) {

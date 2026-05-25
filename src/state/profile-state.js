@@ -372,6 +372,8 @@ function sanitizeGameSettings(rawSettings) {
     3,
     DEFAULT_SETTINGS.targetFireIntervalJitterMax
   );
+  const spawnDistanceMin = clampSetting(rawSettings.spawnDistanceMin, 1, 60, DEFAULT_SETTINGS.spawnDistanceMin);
+  const spawnDistanceMax = clampSetting(rawSettings.spawnDistanceMax, spawnDistanceMin, 120, DEFAULT_SETTINGS.spawnDistanceMax);
 
   return {
     lookSensitivity: clampSetting(rawSettings.lookSensitivity, 1, 10, DEFAULT_SETTINGS.lookSensitivity),
@@ -401,6 +403,13 @@ function sanitizeGameSettings(rawSettings) {
     targetHorizontalSpeedMin: clampSetting(targetHorizontalSpeedMin, 0.1, 5, DEFAULT_SETTINGS.targetHorizontalSpeedMin),
     targetHorizontalSpeedMax: clampSetting(targetHorizontalSpeedMax, 0.1, 5, DEFAULT_SETTINGS.targetHorizontalSpeedMax),
     targetCount: clampSetting(rawSettings.targetCount, 1, 3, DEFAULT_SETTINGS.targetCount),
+    targetWidth: clampSetting(
+      rawSettings.targetWidth ?? (typeof rawSettings.targetRadius === 'number' ? rawSettings.targetRadius * 2 : undefined),
+      0.1,
+      3,
+      DEFAULT_SETTINGS.targetWidth
+    ),
+    targetHeight: clampSetting(rawSettings.targetHeight, 0.3, 4, DEFAULT_SETTINGS.targetHeight),
     targetRadius: clampSetting(rawSettings.targetRadius, 0.1, 2, DEFAULT_SETTINGS.targetRadius),
     targetMaxHealth: clampSetting(rawSettings.targetMaxHealth, 1, 100, DEFAULT_SETTINGS.targetMaxHealth),
     targetSpawnYVariance: clampSetting(rawSettings.targetSpawnYVariance, 0, 3, DEFAULT_SETTINGS.targetSpawnYVariance),
@@ -456,8 +465,8 @@ function sanitizeGameSettings(rawSettings) {
       1,
       DEFAULT_SETTINGS.targetGroundSpawnChance
     ),
-    spawnDistanceMin: clampSetting(rawSettings.spawnDistanceMin, 1, 60, DEFAULT_SETTINGS.spawnDistanceMin),
-    spawnDistanceMax: clampSetting(rawSettings.spawnDistanceMax, 1, 120, DEFAULT_SETTINGS.spawnDistanceMax),
+    spawnDistanceMin,
+    spawnDistanceMax,
     targetLifetimeMin: clampSetting(rawSettings.targetLifetimeMin, 1, 60, DEFAULT_SETTINGS.targetLifetimeMin),
     targetLifetimeMax: clampSetting(rawSettings.targetLifetimeMax, 1, 60, DEFAULT_SETTINGS.targetLifetimeMax),
     enemyProjectileSpeed: clampSetting(

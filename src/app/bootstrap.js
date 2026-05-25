@@ -52,7 +52,8 @@ export function bootstrapApp() {
     settings,
     getCameraOrigin: sceneSystem.getCameraOrigin,
     getCameraForward: sceneSystem.getCameraForward,
-    isAdsSnapActive: aimAssistSystem.isAdsSnapActive
+    isAdsSnapActive: aimAssistSystem.isAdsSnapActive,
+    getSpawnBounds: targetSystem.getSpawnBounds
   });
   const combatSystem = createCombatSystem({
     scene: sceneSystem.scene,
@@ -174,7 +175,7 @@ export function bootstrapApp() {
     sceneSystem.updateCamera();
     playerSystem.updatePlayerVelocity(delta);
     if (!state.isGameOver) {
-      combatSystem.updateFiring(delta, input.shootPressed, input.controllerAimAssistActive);
+      combatSystem.updateFiring(delta, input.shootPressed);
     }
     debugSystem.updateAimAssistDebugVisuals();
     sceneSystem.updateWeaponTransform();
