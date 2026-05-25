@@ -66,6 +66,7 @@ export function bootstrapApp() {
     getCameraOrigin: sceneSystem.getCameraOrigin,
     getProjectileStart: sceneSystem.getProjectileStart,
     updateCamera: sceneSystem.updateCamera,
+    playWeaponShotSound: hitSoundController.playWeaponShotSound,
     getTargetRoot: targetSystem.getTargetRoot,
     applyHitToTarget: targetSystem.applyHitToTarget,
     getNearestTargetInCone: aimAssistSystem.getNearestTargetInCone,

@@ -13,6 +13,7 @@ export function createCombatSystem({
   getCameraOrigin,
   getProjectileStart,
   updateCamera,
+  playWeaponShotSound,
   getTargetRoot,
   applyHitToTarget,
   getNearestTargetInCone,
@@ -59,6 +60,7 @@ export function createCombatSystem({
   function fireShot() {
     state.shots += 1;
     state.hasPlayerFiredShot = true;
+    playWeaponShotSound();
 
     const recoilPoint = getRecoilPoint(state.recoilShotIndex);
     const recoilOffset = getRecoilOffset(recoilPoint.clone());
