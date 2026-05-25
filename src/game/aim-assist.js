@@ -93,9 +93,36 @@ export function createAimAssistSystem({ state, settings, camera, targets, raycas
   }
 
   function getTargetSamplePoints(target) {
+    const body = target.userData.body;
+    const head = target.userData.head;
+    const bodyHalfWidth = (body.geometry.parameters.width * body.scale.x) / 2;
+    const bodyHalfHeight = (body.geometry.parameters.height * body.scale.y) / 2;
+    const bodyHalfDepth = (body.geometry.parameters.depth * body.scale.z) / 2;
+    const headRadius = head.geometry.parameters.radius * head.scale.x;
+
     return [
-      target.localToWorld(target.userData.body.position.clone()),
-      target.localToWorld(target.userData.head.position.clone())
+      ...getLocalOffsetSamplePoints(target, body.position, [
+        new THREE.Vector3(0, 0, 0),
+        new THREE.Vector3(-bodyHalfWidth, 0, 0),
+        new THREE.Vector3(bodyHalfWidth, 0, 0),
+        new THREE.Vector3(0, bodyHalfHeight, 0),
+        new THREE.Vector3(0, -bodyHalfHeight, 0),
+        new THREE.Vector3(0, 0, -bodyHalfDepth),
+        new THREE.Vector3(0, 0, bodyHalfDepth),
+        new THREE.Vector3(-bodyHalfWidth, bodyHalfHeight, 0),
+        new THREE.Vector3(bodyHalfWidth, bodyHalfHeight, 0),
+        new THREE.Vector3(-bodyHalfWidth, -bodyHalfHeight, 0),
+        new THREE.Vector3(bodyHalfWidth, -bodyHalfHeight, 0)
+      ]),
+      ...getLocalOffsetSamplePoints(target, head.position, [
+        new THREE.Vector3(0, 0, 0),
+        new THREE.Vector3(-headRadius, 0, 0),
+        new THREE.Vector3(headRadius, 0, 0),
+        new THREE.Vector3(0, headRadius, 0),
+        new THREE.Vector3(0, -headRadius, 0),
+        new THREE.Vector3(0, 0, -headRadius),
+        new THREE.Vector3(0, 0, headRadius)
+      ])
     ];
   }
 
@@ -193,6 +220,10 @@ export function createAimAssistSystem({ state, settings, camera, targets, raycas
     getNearestTargetInCone,
     getTargetAimPoint
   };
+}
+
+function getLocalOffsetSamplePoints(target, center, offsets) {
+  return offsets.map((offset) => target.localToWorld(center.clone().add(offset)));
 }
 
 function getHorizontalStickinessPoint(point, originY) {
