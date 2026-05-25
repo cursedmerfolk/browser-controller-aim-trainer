@@ -336,19 +336,66 @@ function sanitizeGameSettings(rawSettings) {
     typeof rawSettings.targetHorizontalSpeedMax === 'number'
       ? rawSettings.targetHorizontalSpeedMax
       : LEGACY_TARGET_SPEED_MAX * legacySphereSpeed;
+  const targetFireIntervalMin = clampSetting(
+    rawSettings.targetFireIntervalMin,
+    0.1,
+    10,
+    DEFAULT_SETTINGS.targetFireIntervalMin
+  );
+  const targetFireIntervalMax = clampSetting(
+    rawSettings.targetFireIntervalMax,
+    targetFireIntervalMin,
+    10,
+    DEFAULT_SETTINGS.targetFireIntervalMax
+  );
+  const targetFireIntervalScaleMin = clampSetting(
+    rawSettings.targetFireIntervalScaleMin,
+    0.1,
+    3,
+    DEFAULT_SETTINGS.targetFireIntervalScaleMin
+  );
+  const targetFireIntervalScaleMax = clampSetting(
+    rawSettings.targetFireIntervalScaleMax,
+    targetFireIntervalScaleMin,
+    3,
+    DEFAULT_SETTINGS.targetFireIntervalScaleMax
+  );
+  const targetFireIntervalJitterMin = clampSetting(
+    rawSettings.targetFireIntervalJitterMin,
+    0,
+    3,
+    DEFAULT_SETTINGS.targetFireIntervalJitterMin
+  );
+  const targetFireIntervalJitterMax = clampSetting(
+    rawSettings.targetFireIntervalJitterMax,
+    targetFireIntervalJitterMin,
+    3,
+    DEFAULT_SETTINGS.targetFireIntervalJitterMax
+  );
 
   return {
     lookSensitivity: clampSetting(rawSettings.lookSensitivity, 1, 10, DEFAULT_SETTINGS.lookSensitivity),
     mouseSensitivity: clampSetting(rawSettings.mouseSensitivity, 0.05, 1, DEFAULT_SETTINGS.mouseSensitivity),
     maxStrafeSpeed: clampSetting(rawSettings.maxStrafeSpeed, 1, 20, DEFAULT_SETTINGS.maxStrafeSpeed),
+    strafeAcceleration: clampSetting(rawSettings.strafeAcceleration, 1, 30, DEFAULT_SETTINGS.strafeAcceleration),
     deadzone: clampSetting(rawSettings.deadzone, 0, 0.35, DEFAULT_SETTINGS.deadzone),
     invertY: typeof rawSettings.invertY === 'boolean' ? rawSettings.invertY : DEFAULT_SETTINGS.invertY,
     fov: clampSetting(rawSettings.fov, 50, 110, DEFAULT_SETTINGS.fov),
     fpsMax: clampSetting(rawSettings.fpsMax, 0, 240, DEFAULT_SETTINGS.fpsMax),
     responseCurve: sanitizeResponseCurve(rawSettings.responseCurve),
     aimSlow: clampSetting(rawSettings.aimSlow, 0, 1, DEFAULT_SETTINGS.aimSlow),
+    aimSlowConeAngle: clampSetting(rawSettings.aimSlowConeAngle, 0, 10, DEFAULT_SETTINGS.aimSlowConeAngle),
     aimStickiness: clampSetting(rawSettings.aimStickiness, 0, 1, DEFAULT_SETTINGS.aimStickiness),
     adsSnap: clampSetting(rawSettings.adsSnap, 0, 1, DEFAULT_SETTINGS.adsSnap),
+    adsSnapRadius: clampSetting(rawSettings.adsSnapRadius, 0, 5, DEFAULT_SETTINGS.adsSnapRadius),
+    adsSnapBlendMax: clampSetting(rawSettings.adsSnapBlendMax, 0, 1, DEFAULT_SETTINGS.adsSnapBlendMax),
+    adsSnapPullSpeed: clampSetting(rawSettings.adsSnapPullSpeed, 1, 30, DEFAULT_SETTINGS.adsSnapPullSpeed),
+    controllerVerticalSensitivityRatio: clampSetting(
+      rawSettings.controllerVerticalSensitivityRatio,
+      0.1,
+      2,
+      DEFAULT_SETTINGS.controllerVerticalSensitivityRatio
+    ),
     showDebugShapes:
       typeof rawSettings.showDebugShapes === 'boolean' ? rawSettings.showDebugShapes : DEFAULT_SETTINGS.showDebugShapes,
     targetHorizontalSpeedMin: clampSetting(targetHorizontalSpeedMin, 0.1, 5, DEFAULT_SETTINGS.targetHorizontalSpeedMin),
@@ -376,10 +423,49 @@ function sanitizeGameSettings(rawSettings) {
       6,
       DEFAULT_SETTINGS.targetStrafeOscillationSpeed
     ),
+    targetFireIntervalMin,
+    targetFireIntervalMax,
+    targetProjectilesPerBurst: Math.round(
+      clampSetting(rawSettings.targetProjectilesPerBurst, 1, 8, DEFAULT_SETTINGS.targetProjectilesPerBurst)
+    ),
+    targetProjectileBurstSpread: clampSetting(
+      rawSettings.targetProjectileBurstSpread,
+      0,
+      3,
+      DEFAULT_SETTINGS.targetProjectileBurstSpread
+    ),
+    targetInitialFireDelayMax: clampSetting(
+      rawSettings.targetInitialFireDelayMax,
+      0,
+      5,
+      DEFAULT_SETTINGS.targetInitialFireDelayMax
+    ),
+    targetFireIntervalScaleMin,
+    targetFireIntervalScaleMax,
+    targetFireIntervalJitterMin,
+    targetFireIntervalJitterMax,
+    targetSpawnWidthFactor: clampSetting(
+      rawSettings.targetSpawnWidthFactor,
+      0.02,
+      0.5,
+      DEFAULT_SETTINGS.targetSpawnWidthFactor
+    ),
+    targetGroundSpawnChance: clampSetting(
+      rawSettings.targetGroundSpawnChance,
+      0,
+      1,
+      DEFAULT_SETTINGS.targetGroundSpawnChance
+    ),
     spawnDistanceMin: clampSetting(rawSettings.spawnDistanceMin, 1, 60, DEFAULT_SETTINGS.spawnDistanceMin),
     spawnDistanceMax: clampSetting(rawSettings.spawnDistanceMax, 1, 120, DEFAULT_SETTINGS.spawnDistanceMax),
     targetLifetimeMin: clampSetting(rawSettings.targetLifetimeMin, 1, 60, DEFAULT_SETTINGS.targetLifetimeMin),
     targetLifetimeMax: clampSetting(rawSettings.targetLifetimeMax, 1, 60, DEFAULT_SETTINGS.targetLifetimeMax),
+    enemyProjectileSpeed: clampSetting(
+      rawSettings.enemyProjectileSpeed,
+      1,
+      200,
+      DEFAULT_SETTINGS.enemyProjectileSpeed
+    ),
     adsFovMultiplier: clampSetting(rawSettings.adsFovMultiplier, 0.2, 1, DEFAULT_SETTINGS.adsFovMultiplier),
     adsSensitivityMultiplier: clampSetting(rawSettings.adsSensitivityMultiplier, 0.1, 1, DEFAULT_SETTINGS.adsSensitivityMultiplier),
     hipFireSpreadPx: clampSetting(rawSettings.hipFireSpreadPx, 0, 100, DEFAULT_SETTINGS.hipFireSpreadPx),
@@ -397,6 +483,14 @@ function sanitizeGunSettings(rawSettings) {
   return {
     projectileRate: clampSetting(rawSettings.projectileRate, 1, 15, DEFAULT_SETTINGS.projectileRate),
     bulletMagnetism: clampSetting(rawSettings.bulletMagnetism, 0, 3, DEFAULT_SETTINGS.bulletMagnetism),
+    bulletMagnetismConeAngle: clampSetting(
+      rawSettings.bulletMagnetismConeAngle,
+      0,
+      10,
+      DEFAULT_SETTINGS.bulletMagnetismConeAngle
+    ),
+    bodyShotDamage: clampSetting(rawSettings.bodyShotDamage, 0.1, 10, DEFAULT_SETTINGS.bodyShotDamage),
+    headShotDamage: clampSetting(rawSettings.headShotDamage, 0.1, 10, DEFAULT_SETTINGS.headShotDamage),
     recoilYStrength: clampSetting(
       rawSettings.recoilYStrength ?? rawSettings.recoilPatternStrength ?? rawSettings.sprayPatternStrength,
       0.05,

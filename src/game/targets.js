@@ -1,18 +1,11 @@
 import * as THREE from 'three';
 import {
-  BODY_SHOT_DAMAGE,
   FULL_HEALTH_COLOR,
   FULL_HEALTH_EMISSIVE,
-  HEAD_SHOT_DAMAGE,
   LOW_HEALTH_COLOR,
   LOW_HEALTH_EMISSIVE,
   TARGET_BODY_BASE_HEIGHT,
-  TARGET_FIRE_INTERVAL_MAX,
-  TARGET_FIRE_INTERVAL_MIN,
-  TARGET_HEAD_RADIUS,
-  TARGET_PROJECTILE_BURST_SPREAD,
-  TARGET_PROJECTILES_PER_BURST,
-  TARGET_SPAWN_WIDTH_FACTOR
+  TARGET_HEAD_RADIUS
 } from '../config/constants.js';
 import { getTriangleWave, randomRange } from '../utils/math.js';
 
@@ -61,10 +54,10 @@ export function createTargetSystem({ scene, camera, backWall, state, settings, p
     target.userData.horizontalVelocity = new THREE.Vector3();
     target.userData.age = 0;
     target.userData.lifetime = settings.targetLifetimeMax;
+    target.userData.settings = settings;
     target.userData.body = body;
     target.userData.head = head;
-    target.userData.fireIntervalScale = randomRange(0.8, 1.3);
-    target.userData.fireIntervalJitter = randomRange(0.15, 0.85);
+    target.userData.fireIntervalScale = settings.targetFireIntervalScaleMin;
     target.userData.strafePhase = 0;
     target.userData.widthScale = 1;
     target.userData.bodyHeightScale = 1.45;
@@ -79,7 +72,7 @@ export function createTargetSystem({ scene, camera, backWall, state, settings, p
 
   function applyHitToTarget(target, isHeadshot = false) {
     state.hits += 1;
-    target.userData.health -= isHeadshot ? HEAD_SHOT_DAMAGE : BODY_SHOT_DAMAGE;
+    target.userData.health -= isHeadshot ? settings.headShotDamage : settings.bodyShotDamage;
     playHitTickSound();
 
     if (target.userData.health <= 0) {
@@ -93,14 +86,14 @@ export function createTargetSystem({ scene, camera, backWall, state, settings, p
 
   function respawnTarget(target) {
     const distance = randomRange(settings.spawnDistanceMin, settings.spawnDistanceMax);
-    const spawnBoxHalfWidth = (backWall.geometry.parameters.width * TARGET_SPAWN_WIDTH_FACTOR) / 2;
+    const spawnBoxHalfWidth = (backWall.geometry.parameters.width * settings.targetSpawnWidthFactor) / 2;
     const spawnBoxCenterX = camera.position.x;
     const worldPosition = new THREE.Vector3(
       randomRange(spawnBoxCenterX - spawnBoxHalfWidth, spawnBoxCenterX + spawnBoxHalfWidth),
       camera.position.y,
       camera.position.z - distance
     );
-    if (Math.random() < 0.3) {
+    if (Math.random() < settings.targetGroundSpawnChance) {
       worldPosition.y = target.userData.feetClearance;
     } else {
       worldPosition.y = randomRange(
@@ -118,6 +111,7 @@ export function createTargetSystem({ scene, camera, backWall, state, settings, p
     target.userData.age = 0;
     target.userData.lifetime = randomRange(settings.targetLifetimeMin, settings.targetLifetimeMax);
     target.userData.verticalOscillationPhase = randomRange(0, Math.PI * 2);
+    target.userData.fireIntervalScale = randomRange(settings.targetFireIntervalScaleMin, settings.targetFireIntervalScaleMax);
     target.userData.fireCooldown = getNextTargetFireCooldown(target, true);
     target.userData.strafePhase = randomRange(0, Math.PI * 2);
     target.userData.health = target.userData.maxHealth;
@@ -204,9 +198,9 @@ export function createTargetSystem({ scene, camera, backWall, state, settings, p
       updateTargetPosition(target);
 
       if (!state.isGameOver && target.userData.fireCooldown <= 0) {
-        for (let burstIndex = 0; burstIndex < TARGET_PROJECTILES_PER_BURST; burstIndex += 1) {
-          const burstCenterOffset = burstIndex - (TARGET_PROJECTILES_PER_BURST - 1) / 2;
-          fireTargetProjectile(target, burstCenterOffset * TARGET_PROJECTILE_BURST_SPREAD);
+        for (let burstIndex = 0; burstIndex < settings.targetProjectilesPerBurst; burstIndex += 1) {
+          const burstCenterOffset = burstIndex - (settings.targetProjectilesPerBurst - 1) / 2;
+          fireTargetProjectile(target, burstCenterOffset * settings.targetProjectileBurstSpread);
         }
         target.userData.fireCooldown = getNextTargetFireCooldown(target);
       }
@@ -228,8 +222,9 @@ export function createTargetSystem({ scene, camera, backWall, state, settings, p
 }
 
 function getNextTargetFireCooldown(target, isInitialSpawn = false) {
-  const baseInterval = randomRange(TARGET_FIRE_INTERVAL_MIN, TARGET_FIRE_INTERVAL_MAX) * target.userData.fireIntervalScale;
-  const jitter = randomRange(0, target.userData.fireIntervalJitter);
-  const initialDelay = isInitialSpawn ? randomRange(0, 1.1) : 0;
+  const settings = target.userData.settings;
+  const baseInterval = randomRange(settings.targetFireIntervalMin, settings.targetFireIntervalMax) * target.userData.fireIntervalScale;
+  const jitter = randomRange(settings.targetFireIntervalJitterMin, settings.targetFireIntervalJitterMax);
+  const initialDelay = isInitialSpawn ? randomRange(0, settings.targetInitialFireDelayMax) : 0;
   return baseInterval + jitter + initialDelay;
 }

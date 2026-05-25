@@ -1,10 +1,5 @@
 import * as THREE from 'three';
-import {
-  PLAYER_EYE_HEIGHT,
-  PLAYER_MAX_HEALTH,
-  PLAYER_STRAFE_ACCELERATION,
-  PLAYER_STRAFE_DECELERATION
-} from '../config/constants.js';
+import { PLAYER_EYE_HEIGHT, PLAYER_MAX_HEALTH } from '../config/constants.js';
 
 export function createPlayerSystem({
   state,
@@ -71,9 +66,7 @@ export function createPlayerSystem({
 
   function applyPlayerMovement(moveX, delta) {
     const targetVelocityX = moveX * settings.maxStrafeSpeed;
-    const acceleration =
-      Math.abs(targetVelocityX) > Math.abs(state.strafeVelocityX) ? PLAYER_STRAFE_ACCELERATION : PLAYER_STRAFE_DECELERATION;
-    state.strafeVelocityX = THREE.MathUtils.damp(state.strafeVelocityX, targetVelocityX, acceleration, delta);
+    state.strafeVelocityX = THREE.MathUtils.damp(state.strafeVelocityX, targetVelocityX, settings.strafeAcceleration, delta);
 
     if (Math.abs(state.strafeVelocityX) < 0.001) {
       state.strafeVelocityX = 0;

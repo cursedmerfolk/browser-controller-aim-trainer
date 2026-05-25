@@ -1,21 +1,30 @@
 import * as THREE from 'three';
-import {
-  ADS_SNAP_CYLINDER_RADIUS,
-  BULLET_MAGNETISM_CONE_ANGLE,
-  DEBUG_VISUAL_OFFSET
-} from '../config/constants.js';
+import { DEBUG_VISUAL_OFFSET } from '../config/constants.js';
 
 export function createDebugSystem({ scene, camera, settings, getCameraOrigin, getCameraForward, isAdsSnapActive }) {
   const group = new THREE.Group();
-  const lineLength = settings.projectileMaxDistance;
-  const magnetismCone = createDebugCone(BULLET_MAGNETISM_CONE_ANGLE, lineLength, 0xffb347);
-  group.add(magnetismCone);
-
-  const adsSnapCylinder = createDebugCylinder(ADS_SNAP_CYLINDER_RADIUS, lineLength, 0xff4d6d);
-  group.add(adsSnapCylinder);
   scene.add(group);
+  let magnetismCone;
+  let adsSnapCylinder;
+  let debugGeometryKey = '';
+
+  function rebuildDebugGeometryIfNeeded() {
+    const nextKey = `${settings.projectileMaxDistance}|${settings.bulletMagnetismConeAngle}|${settings.adsSnapRadius}`;
+    if (nextKey === debugGeometryKey) {
+      return;
+    }
+
+    group.clear();
+    const lineLength = settings.projectileMaxDistance;
+    magnetismCone = createDebugCone(THREE.MathUtils.degToRad(settings.bulletMagnetismConeAngle), lineLength, 0xffb347);
+    adsSnapCylinder = createDebugCylinder(settings.adsSnapRadius, lineLength, 0xff4d6d);
+    group.add(magnetismCone);
+    group.add(adsSnapCylinder);
+    debugGeometryKey = nextKey;
+  }
 
   function updateAimAssistDebugVisuals() {
+    rebuildDebugGeometryIfNeeded();
     const debugOrigin = getCameraOrigin().addScaledVector(getCameraForward(), DEBUG_VISUAL_OFFSET);
     group.position.copy(debugOrigin);
     group.quaternion.copy(camera.getWorldQuaternion(new THREE.Quaternion()));

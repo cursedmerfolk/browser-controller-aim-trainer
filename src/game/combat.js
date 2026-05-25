@@ -1,11 +1,5 @@
 import * as THREE from 'three';
-import {
-  BULLET_MAGNETISM_CONE_ANGLE,
-  PROJECTILE_UP_AXIS,
-  TARGET_PROJECTILE_DAMAGE,
-  TARGET_PROJECTILE_HIT_RADIUS,
-  TARGET_PROJECTILE_SPEED
-} from '../config/constants.js';
+import { PROJECTILE_UP_AXIS, TARGET_PROJECTILE_DAMAGE, TARGET_PROJECTILE_HIT_RADIUS } from '../config/constants.js';
 import { getDistanceToSegment, getTriangleWave, randomRange } from '../utils/math.js';
 
 export function createCombatSystem({
@@ -109,7 +103,11 @@ export function createCombatSystem({
       return baseDirection;
     }
 
-    const magnetismTarget = getNearestTargetInCone(getCameraOrigin(), baseDirection, BULLET_MAGNETISM_CONE_ANGLE);
+    const magnetismTarget = getNearestTargetInCone(
+      getCameraOrigin(),
+      baseDirection,
+      THREE.MathUtils.degToRad(settings.bulletMagnetismConeAngle)
+    );
     if (!magnetismTarget) {
       return baseDirection;
     }
@@ -244,7 +242,7 @@ export function createCombatSystem({
       previousHead: start.clone(),
       trailLength: Math.min(Math.max(distance * 0.3, 1.5), 4.5),
       progress: 0,
-      duration: Math.max(distance / TARGET_PROJECTILE_SPEED, 0.04)
+      duration: Math.max(distance / settings.enemyProjectileSpeed, 0.04)
     });
   }
 

@@ -33,14 +33,20 @@ export function renderSettingsPanelMarkup({ settings, profileController }) {
       })}
       <strong>Game settings</strong>
       ${renderNumericControl({ id: 'sensitivity', label: 'Controller sensitivity', min: 1, max: 10, step: 0.1, value: settings.lookSensitivity })}
+      ${renderNumericControl({ id: 'controller-vertical-sensitivity-ratio', label: 'Vertical sensitivity ratio', min: 0.1, max: 2, step: 0.01, value: settings.controllerVerticalSensitivityRatio })}
       ${renderNumericControl({ id: 'mouse-sensitivity', label: 'Mouse sensitivity', min: 0.05, max: 1, step: 0.01, value: settings.mouseSensitivity })}
       ${renderNumericControl({ id: 'max-strafe-speed', label: 'Max strafe speed', min: 1, max: 20, step: 0.1, value: settings.maxStrafeSpeed })}
+      ${renderNumericControl({ id: 'strafe-acceleration', label: 'Strafe acceleration', min: 1, max: 30, step: 0.1, value: settings.strafeAcceleration })}
       ${renderNumericControl({ id: 'deadzone', label: 'Deadzone', min: 0, max: 0.35, step: 0.01, value: settings.deadzone })}
       ${renderNumericControl({ id: 'fov', label: 'FOV', min: 50, max: 110, step: 1, value: settings.fov })}
       ${renderNumericControl({ id: 'fps-max', label: 'FPS maximum (0 = uncapped)', min: 0, max: 240, step: 1, value: settings.fpsMax })}
       ${renderNumericControl({ id: 'aim-slow', label: 'Aim slow', min: 0, max: 1, step: 0.01, value: settings.aimSlow })}
+      ${renderNumericControl({ id: 'aim-slow-cone-angle', label: 'Aim slow cone angle', min: 0, max: 10, step: 0.1, value: settings.aimSlowConeAngle })}
       ${renderNumericControl({ id: 'aim-stickiness', label: 'Aim stickiness', min: 0, max: 1, step: 0.01, value: settings.aimStickiness })}
       ${renderNumericControl({ id: 'ads-snap', label: 'ADS snap', min: 0, max: 1, step: 0.01, value: settings.adsSnap })}
+      ${renderNumericControl({ id: 'ads-snap-radius', label: 'ADS snap radius', min: 0, max: 5, step: 0.05, value: settings.adsSnapRadius })}
+      ${renderNumericControl({ id: 'ads-snap-blend-max', label: 'ADS snap blend max', min: 0, max: 1, step: 0.01, value: settings.adsSnapBlendMax })}
+      ${renderNumericControl({ id: 'ads-snap-pull-speed', label: 'ADS snap pull speed', min: 1, max: 30, step: 0.1, value: settings.adsSnapPullSpeed })}
       ${renderNumericControl({ id: 'target-speed-min', label: 'Min target speed', min: 0.1, max: 5, step: 0.05, value: settings.targetHorizontalSpeedMin })}
       ${renderNumericControl({ id: 'target-speed-max', label: 'Max target speed', min: 0.1, max: 5, step: 0.05, value: settings.targetHorizontalSpeedMax })}
       ${renderNumericControl({ id: 'target-spawn-y-variance', label: 'Target Y spawn variance', min: 0, max: 3, step: 0.05, value: settings.targetSpawnYVariance })}
@@ -48,6 +54,18 @@ export function renderSettingsPanelMarkup({ settings, profileController }) {
       ${renderNumericControl({ id: 'target-vertical-oscillation-speed', label: 'Target Y oscillation speed', min: 0, max: 6, step: 0.05, value: settings.targetVerticalOscillationSpeed })}
       ${renderNumericControl({ id: 'target-strafe-amount', label: 'Target strafe amount', min: 0, max: 3, step: 0.05, value: settings.targetStrafeAmount })}
       ${renderNumericControl({ id: 'target-strafe-oscillation-speed', label: 'Target strafe zigzag speed', min: 0, max: 6, step: 0.05, value: settings.targetStrafeOscillationSpeed })}
+      ${renderNumericControl({ id: 'target-fire-interval-min', label: 'Target fire interval min', min: 0.1, max: 10, step: 0.05, value: settings.targetFireIntervalMin })}
+      ${renderNumericControl({ id: 'target-fire-interval-max', label: 'Target fire interval max', min: 0.1, max: 10, step: 0.05, value: settings.targetFireIntervalMax })}
+      ${renderNumericControl({ id: 'target-projectiles-per-burst', label: 'Target projectiles per burst', min: 1, max: 8, step: 1, value: settings.targetProjectilesPerBurst })}
+      ${renderNumericControl({ id: 'target-projectile-burst-spread', label: 'Target burst spread', min: 0, max: 3, step: 0.05, value: settings.targetProjectileBurstSpread })}
+      ${renderNumericControl({ id: 'target-initial-fire-delay-max', label: 'Target initial fire delay max', min: 0, max: 5, step: 0.05, value: settings.targetInitialFireDelayMax })}
+      ${renderNumericControl({ id: 'target-fire-interval-scale-min', label: 'Fire cadence scale min', min: 0.1, max: 3, step: 0.05, value: settings.targetFireIntervalScaleMin })}
+      ${renderNumericControl({ id: 'target-fire-interval-scale-max', label: 'Fire cadence scale max', min: 0.1, max: 3, step: 0.05, value: settings.targetFireIntervalScaleMax })}
+      ${renderNumericControl({ id: 'target-fire-interval-jitter-min', label: 'Fire jitter min', min: 0, max: 3, step: 0.05, value: settings.targetFireIntervalJitterMin })}
+      ${renderNumericControl({ id: 'target-fire-interval-jitter-max', label: 'Fire jitter max', min: 0, max: 3, step: 0.05, value: settings.targetFireIntervalJitterMax })}
+      ${renderNumericControl({ id: 'target-spawn-width-factor', label: 'Target spawn width factor', min: 0.02, max: 0.5, step: 0.01, value: settings.targetSpawnWidthFactor })}
+      ${renderNumericControl({ id: 'target-ground-spawn-chance', label: 'Target ground spawn chance', min: 0, max: 1, step: 0.01, value: settings.targetGroundSpawnChance })}
+      ${renderNumericControl({ id: 'enemy-projectile-speed', label: 'Enemy projectile speed', min: 1, max: 200, step: 1, value: settings.enemyProjectileSpeed })}
       <label class="control-group" for="response-curve-input">
         <span>Response curve</span>
         <select id="response-curve-input">
@@ -72,6 +90,9 @@ export function renderSettingsPanelMarkup({ settings, profileController }) {
       <strong>Gun settings</strong>
       ${renderNumericControl({ id: 'projectile-rate', label: 'Projectile rate', min: 1, max: 15, step: 0.5, value: settings.projectileRate })}
       ${renderNumericControl({ id: 'bullet-magnetism', label: 'Bullet magnetism', min: 0, max: 3, step: 0.01, value: settings.bulletMagnetism })}
+      ${renderNumericControl({ id: 'bullet-magnetism-cone-angle', label: 'Bullet magnetism cone angle', min: 0, max: 10, step: 0.1, value: settings.bulletMagnetismConeAngle })}
+      ${renderNumericControl({ id: 'body-shot-damage', label: 'Body shot damage', min: 0.1, max: 10, step: 0.1, value: settings.bodyShotDamage })}
+      ${renderNumericControl({ id: 'head-shot-damage', label: 'Headshot damage', min: 0.1, max: 10, step: 0.1, value: settings.headShotDamage })}
       ${renderNumericControl({ id: 'recoil-y-strength', label: 'Recoil Y strength', min: 0.05, max: 2.5, step: 0.05, value: settings.recoilYStrength })}
       ${renderNumericControl({ id: 'recoil-variance', label: 'Recoil variance', min: 0, max: 10, step: 0.05, value: settings.recoilVariance })}
       ${renderNumericControl({ id: 'recoil-horizontal-oscillation', label: 'Recoil horiz. oscillation', min: 0, max: 5, step: 0.05, value: settings.recoilHorizontalOscillationStrength })}
@@ -110,16 +131,58 @@ export function createSettingsPanelController({
 
   const numericBindings = [
     { id: 'sensitivity', min: 1, max: 10, fallback: DEFAULT_SETTINGS.lookSensitivity, onChange: (value) => { settings.lookSensitivity = value; } },
+    {
+      id: 'controller-vertical-sensitivity-ratio',
+      min: 0.1,
+      max: 2,
+      fallback: DEFAULT_SETTINGS.controllerVerticalSensitivityRatio,
+      onChange: (value) => { settings.controllerVerticalSensitivityRatio = value; }
+    },
     { id: 'mouse-sensitivity', min: 0.05, max: 1, fallback: DEFAULT_SETTINGS.mouseSensitivity, onChange: (value) => { settings.mouseSensitivity = value; } },
     { id: 'deadzone', min: 0, max: 0.35, fallback: DEFAULT_SETTINGS.deadzone, onChange: (value) => { settings.deadzone = value; } },
     { id: 'max-strafe-speed', min: 1, max: 20, fallback: DEFAULT_SETTINGS.maxStrafeSpeed, onChange: (value) => { settings.maxStrafeSpeed = value; } },
+    {
+      id: 'strafe-acceleration',
+      min: 1,
+      max: 30,
+      fallback: DEFAULT_SETTINGS.strafeAcceleration,
+      onChange: (value) => { settings.strafeAcceleration = value; }
+    },
     { id: 'fov', min: 50, max: 110, fallback: DEFAULT_SETTINGS.fov, onChange: (value) => { settings.fov = value; } },
     { id: 'fps-max', min: 0, max: 240, fallback: DEFAULT_SETTINGS.fpsMax, onChange: (value) => { settings.fpsMax = value; } },
     { id: 'projectile-rate', min: 1, max: 15, fallback: DEFAULT_SETTINGS.projectileRate, onChange: (value) => { settings.projectileRate = value; } },
     { id: 'bullet-magnetism', min: 0, max: 3, fallback: DEFAULT_SETTINGS.bulletMagnetism, onChange: (value) => { settings.bulletMagnetism = value; } },
     { id: 'aim-slow', min: 0, max: 1, fallback: DEFAULT_SETTINGS.aimSlow, onChange: (value) => { settings.aimSlow = value; } },
+    {
+      id: 'aim-slow-cone-angle',
+      min: 0,
+      max: 10,
+      fallback: DEFAULT_SETTINGS.aimSlowConeAngle,
+      onChange: (value) => { settings.aimSlowConeAngle = value; }
+    },
     { id: 'aim-stickiness', min: 0, max: 1, fallback: DEFAULT_SETTINGS.aimStickiness, onChange: (value) => { settings.aimStickiness = value; } },
     { id: 'ads-snap', min: 0, max: 1, fallback: DEFAULT_SETTINGS.adsSnap, onChange: (value) => { settings.adsSnap = value; } },
+    {
+      id: 'ads-snap-radius',
+      min: 0,
+      max: 5,
+      fallback: DEFAULT_SETTINGS.adsSnapRadius,
+      onChange: (value) => { settings.adsSnapRadius = value; }
+    },
+    {
+      id: 'ads-snap-blend-max',
+      min: 0,
+      max: 1,
+      fallback: DEFAULT_SETTINGS.adsSnapBlendMax,
+      onChange: (value) => { settings.adsSnapBlendMax = value; }
+    },
+    {
+      id: 'ads-snap-pull-speed',
+      min: 1,
+      max: 30,
+      fallback: DEFAULT_SETTINGS.adsSnapPullSpeed,
+      onChange: (value) => { settings.adsSnapPullSpeed = value; }
+    },
     {
       id: 'target-speed-min',
       min: 0.1,
@@ -191,6 +254,170 @@ export function createSettingsPanelController({
       onChange: (value) => {
         settings.targetStrafeOscillationSpeed = value;
       }
+    },
+    {
+      id: 'target-fire-interval-min',
+      min: 0.1,
+      max: 10,
+      fallback: DEFAULT_SETTINGS.targetFireIntervalMin,
+      onChange: (value) => {
+        settings.targetFireIntervalMin = value;
+        if (settings.targetFireIntervalMax < value) {
+          settings.targetFireIntervalMax = value;
+          setNumericControlValue('target-fire-interval-max', value);
+        }
+        onResetTargets();
+      }
+    },
+    {
+      id: 'target-fire-interval-max',
+      min: 0.1,
+      max: 10,
+      fallback: DEFAULT_SETTINGS.targetFireIntervalMax,
+      onChange: (value) => {
+        settings.targetFireIntervalMax = value;
+        if (settings.targetFireIntervalMin > value) {
+          settings.targetFireIntervalMin = value;
+          setNumericControlValue('target-fire-interval-min', value);
+        }
+        onResetTargets();
+      }
+    },
+    {
+      id: 'target-projectiles-per-burst',
+      min: 1,
+      max: 8,
+      fallback: DEFAULT_SETTINGS.targetProjectilesPerBurst,
+      onChange: (value) => {
+        const roundedValue = Math.round(value);
+        settings.targetProjectilesPerBurst = roundedValue;
+        setNumericControlValue('target-projectiles-per-burst', roundedValue);
+        onResetTargets();
+      }
+    },
+    {
+      id: 'target-projectile-burst-spread',
+      min: 0,
+      max: 3,
+      fallback: DEFAULT_SETTINGS.targetProjectileBurstSpread,
+      onChange: (value) => {
+        settings.targetProjectileBurstSpread = value;
+        onResetTargets();
+      }
+    },
+    {
+      id: 'target-initial-fire-delay-max',
+      min: 0,
+      max: 5,
+      fallback: DEFAULT_SETTINGS.targetInitialFireDelayMax,
+      onChange: (value) => {
+        settings.targetInitialFireDelayMax = value;
+        onResetTargets();
+      }
+    },
+    {
+      id: 'target-fire-interval-scale-min',
+      min: 0.1,
+      max: 3,
+      fallback: DEFAULT_SETTINGS.targetFireIntervalScaleMin,
+      onChange: (value) => {
+        settings.targetFireIntervalScaleMin = value;
+        if (settings.targetFireIntervalScaleMax < value) {
+          settings.targetFireIntervalScaleMax = value;
+          setNumericControlValue('target-fire-interval-scale-max', value);
+        }
+        onResetTargets();
+      }
+    },
+    {
+      id: 'target-fire-interval-scale-max',
+      min: 0.1,
+      max: 3,
+      fallback: DEFAULT_SETTINGS.targetFireIntervalScaleMax,
+      onChange: (value) => {
+        settings.targetFireIntervalScaleMax = value;
+        if (settings.targetFireIntervalScaleMin > value) {
+          settings.targetFireIntervalScaleMin = value;
+          setNumericControlValue('target-fire-interval-scale-min', value);
+        }
+        onResetTargets();
+      }
+    },
+    {
+      id: 'target-fire-interval-jitter-min',
+      min: 0,
+      max: 3,
+      fallback: DEFAULT_SETTINGS.targetFireIntervalJitterMin,
+      onChange: (value) => {
+        settings.targetFireIntervalJitterMin = value;
+        if (settings.targetFireIntervalJitterMax < value) {
+          settings.targetFireIntervalJitterMax = value;
+          setNumericControlValue('target-fire-interval-jitter-max', value);
+        }
+        onResetTargets();
+      }
+    },
+    {
+      id: 'target-fire-interval-jitter-max',
+      min: 0,
+      max: 3,
+      fallback: DEFAULT_SETTINGS.targetFireIntervalJitterMax,
+      onChange: (value) => {
+        settings.targetFireIntervalJitterMax = value;
+        if (settings.targetFireIntervalJitterMin > value) {
+          settings.targetFireIntervalJitterMin = value;
+          setNumericControlValue('target-fire-interval-jitter-min', value);
+        }
+        onResetTargets();
+      }
+    },
+    {
+      id: 'target-spawn-width-factor',
+      min: 0.02,
+      max: 0.5,
+      fallback: DEFAULT_SETTINGS.targetSpawnWidthFactor,
+      onChange: (value) => {
+        settings.targetSpawnWidthFactor = value;
+        onResetTargets();
+      }
+    },
+    {
+      id: 'target-ground-spawn-chance',
+      min: 0,
+      max: 1,
+      fallback: DEFAULT_SETTINGS.targetGroundSpawnChance,
+      onChange: (value) => {
+        settings.targetGroundSpawnChance = value;
+        onResetTargets();
+      }
+    },
+    {
+      id: 'enemy-projectile-speed',
+      min: 1,
+      max: 200,
+      fallback: DEFAULT_SETTINGS.enemyProjectileSpeed,
+      onChange: (value) => { settings.enemyProjectileSpeed = value; }
+    },
+    {
+      id: 'bullet-magnetism-cone-angle',
+      min: 0,
+      max: 10,
+      fallback: DEFAULT_SETTINGS.bulletMagnetismConeAngle,
+      onChange: (value) => { settings.bulletMagnetismConeAngle = value; }
+    },
+    {
+      id: 'body-shot-damage',
+      min: 0.1,
+      max: 10,
+      fallback: DEFAULT_SETTINGS.bodyShotDamage,
+      onChange: (value) => { settings.bodyShotDamage = value; }
+    },
+    {
+      id: 'head-shot-damage',
+      min: 0.1,
+      max: 10,
+      fallback: DEFAULT_SETTINGS.headShotDamage,
+      onChange: (value) => { settings.headShotDamage = value; }
     },
     { id: 'recoil-y-strength', min: 0.05, max: 2.5, fallback: DEFAULT_SETTINGS.recoilYStrength, onChange: (value) => { settings.recoilYStrength = value; } },
     { id: 'recoil-variance', min: 0, max: 10, fallback: DEFAULT_SETTINGS.recoilVariance, onChange: (value) => { settings.recoilVariance = value; } },
@@ -339,16 +566,25 @@ export function createSettingsPanelController({
 
   function syncSettingControls() {
     setNumericControlValue('sensitivity', settings.lookSensitivity);
+    setNumericControlValue('controller-vertical-sensitivity-ratio', settings.controllerVerticalSensitivityRatio);
     setNumericControlValue('mouse-sensitivity', settings.mouseSensitivity);
     setNumericControlValue('max-strafe-speed', settings.maxStrafeSpeed);
+    setNumericControlValue('strafe-acceleration', settings.strafeAcceleration);
     setNumericControlValue('deadzone', settings.deadzone);
     setNumericControlValue('fov', settings.fov);
     setNumericControlValue('fps-max', settings.fpsMax);
     setNumericControlValue('projectile-rate', settings.projectileRate);
     setNumericControlValue('bullet-magnetism', settings.bulletMagnetism);
+    setNumericControlValue('bullet-magnetism-cone-angle', settings.bulletMagnetismConeAngle);
+    setNumericControlValue('body-shot-damage', settings.bodyShotDamage);
+    setNumericControlValue('head-shot-damage', settings.headShotDamage);
     setNumericControlValue('aim-slow', settings.aimSlow);
+    setNumericControlValue('aim-slow-cone-angle', settings.aimSlowConeAngle);
     setNumericControlValue('aim-stickiness', settings.aimStickiness);
     setNumericControlValue('ads-snap', settings.adsSnap);
+    setNumericControlValue('ads-snap-radius', settings.adsSnapRadius);
+    setNumericControlValue('ads-snap-blend-max', settings.adsSnapBlendMax);
+    setNumericControlValue('ads-snap-pull-speed', settings.adsSnapPullSpeed);
     setNumericControlValue('target-speed-min', settings.targetHorizontalSpeedMin);
     setNumericControlValue('target-speed-max', settings.targetHorizontalSpeedMax);
     setNumericControlValue('target-spawn-y-variance', settings.targetSpawnYVariance);
@@ -356,6 +592,18 @@ export function createSettingsPanelController({
     setNumericControlValue('target-vertical-oscillation-speed', settings.targetVerticalOscillationSpeed);
     setNumericControlValue('target-strafe-amount', settings.targetStrafeAmount);
     setNumericControlValue('target-strafe-oscillation-speed', settings.targetStrafeOscillationSpeed);
+    setNumericControlValue('target-fire-interval-min', settings.targetFireIntervalMin);
+    setNumericControlValue('target-fire-interval-max', settings.targetFireIntervalMax);
+    setNumericControlValue('target-projectiles-per-burst', settings.targetProjectilesPerBurst);
+    setNumericControlValue('target-projectile-burst-spread', settings.targetProjectileBurstSpread);
+    setNumericControlValue('target-initial-fire-delay-max', settings.targetInitialFireDelayMax);
+    setNumericControlValue('target-fire-interval-scale-min', settings.targetFireIntervalScaleMin);
+    setNumericControlValue('target-fire-interval-scale-max', settings.targetFireIntervalScaleMax);
+    setNumericControlValue('target-fire-interval-jitter-min', settings.targetFireIntervalJitterMin);
+    setNumericControlValue('target-fire-interval-jitter-max', settings.targetFireIntervalJitterMax);
+    setNumericControlValue('target-spawn-width-factor', settings.targetSpawnWidthFactor);
+    setNumericControlValue('target-ground-spawn-chance', settings.targetGroundSpawnChance);
+    setNumericControlValue('enemy-projectile-speed', settings.enemyProjectileSpeed);
     setNumericControlValue('recoil-y-strength', settings.recoilYStrength);
     setNumericControlValue('recoil-variance', settings.recoilVariance);
     setNumericControlValue('recoil-horizontal-oscillation', settings.recoilHorizontalOscillationStrength);

@@ -1,11 +1,5 @@
 import * as THREE from 'three';
-import {
-  ADS_SNAP_CYLINDER_RADIUS,
-  AIM_SLOW_CONE_ANGLE,
-  BULLET_MAGNETISM_CONE_ANGLE,
-  CENTER_SCREEN,
-  CONTROLLER_VERTICAL_SENSITIVITY_RATIO
-} from '../config/constants.js';
+import { CENTER_SCREEN } from '../config/constants.js';
 
 export function createAimAssistSystem({ state, settings, camera, targets, raycaster, getCameraOrigin, getCameraForward }) {
   function getTargetRoot(object) {
@@ -19,7 +13,7 @@ export function createAimAssistSystem({ state, settings, camera, targets, raycas
     }
 
     const horizontalLookSensitivity = settings.lookSensitivity * sensitivityMultiplier;
-    const verticalLookSensitivity = horizontalLookSensitivity * CONTROLLER_VERTICAL_SENSITIVITY_RATIO;
+    const verticalLookSensitivity = horizontalLookSensitivity * settings.controllerVerticalSensitivityRatio;
     const verticalLook = settings.invertY ? -lookY : lookY;
 
     state.yaw -= lookX * horizontalLookSensitivity * delta;
@@ -51,17 +45,17 @@ export function createAimAssistSystem({ state, settings, camera, targets, raycas
       const nearbyTarget = getNearestTargetInCylinder(
         getCameraOrigin(),
         getCameraForward(),
-        ADS_SNAP_CYLINDER_RADIUS,
+        settings.adsSnapRadius,
         settings.projectileMaxDistance
       );
       if (nearbyTarget) {
-        nudgeAimTowardTarget(nearbyTarget, 1 - Math.exp(-delta * 14 * settings.adsSnap), false);
+        nudgeAimTowardTarget(nearbyTarget, 1 - Math.exp(-delta * settings.adsSnapPullSpeed * settings.adsSnap), false);
       }
     }
   }
 
   function isAdsSnapActive() {
-    return state.isAimingDownSights && state.aimBlend <= 0.9;
+    return state.isAimingDownSights && state.aimBlend <= settings.adsSnapBlendMax;
   }
 
   function getDirectAimTarget() {
@@ -71,7 +65,7 @@ export function createAimAssistSystem({ state, settings, camera, targets, raycas
   }
 
   function getAimSlowTarget() {
-    return getNearestTargetInCone(getCameraOrigin(), getCameraForward(), AIM_SLOW_CONE_ANGLE);
+    return getNearestTargetInCone(getCameraOrigin(), getCameraForward(), THREE.MathUtils.degToRad(settings.aimSlowConeAngle));
   }
 
   function getTargetAimPoint(target, origin = getCameraOrigin(), direction = getCameraForward()) {
@@ -105,7 +99,7 @@ export function createAimAssistSystem({ state, settings, camera, targets, raycas
     ];
   }
 
-  function getNearestTargetInCone(origin, direction, maxAngle = BULLET_MAGNETISM_CONE_ANGLE) {
+  function getNearestTargetInCone(origin, direction, maxAngle = THREE.MathUtils.degToRad(settings.bulletMagnetismConeAngle)) {
     let nearestTarget = null;
     let nearestDistance = Number.POSITIVE_INFINITY;
     let nearestAngle = Number.POSITIVE_INFINITY;

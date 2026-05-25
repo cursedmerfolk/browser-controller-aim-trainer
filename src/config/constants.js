@@ -19,25 +19,11 @@ export const PROJECTILE_UP_AXIS = new THREE.Vector3(0, 1, 0);
 export const MUZZLE_SCALE = new THREE.Vector3(1, 1, 1);
 export const TARGET_BODY_BASE_HEIGHT = 0.96;
 export const TARGET_HEAD_RADIUS = 0.18;
-export const BODY_SHOT_DAMAGE = 1;
-export const HEAD_SHOT_DAMAGE = 1.5;
 export const PLAYER_EYE_HEIGHT = 2.2;
 export const PLAYER_MAX_HEALTH = 50;
-export const PLAYER_STRAFE_ACCELERATION = 14;
-export const PLAYER_STRAFE_DECELERATION = 12;
-export const TARGET_FIRE_INTERVAL_MIN = 1.4;
-export const TARGET_FIRE_INTERVAL_MAX = 2.6;
-export const TARGET_PROJECTILES_PER_BURST = 2;
-export const TARGET_PROJECTILE_BURST_SPREAD = 0.35;
 export const TARGET_PROJECTILE_DAMAGE = 1;
 export const TARGET_PROJECTILE_HIT_RADIUS = 0.4;
-export const TARGET_PROJECTILE_SPEED = 72;
-export const TARGET_SPAWN_WIDTH_FACTOR = 0.14;
 export const CENTER_SCREEN = new THREE.Vector2(0, 0);
-export const AIM_SLOW_CONE_ANGLE = THREE.MathUtils.degToRad(2);
-export const BULLET_MAGNETISM_CONE_ANGLE = THREE.MathUtils.degToRad(1);
-export const CONTROLLER_VERTICAL_SENSITIVITY_RATIO = 0.75;
-export const ADS_SNAP_CYLINDER_RADIUS = 1;
 export const DEBUG_VISUAL_OFFSET = 0.2;
 export const LEGACY_TARGET_SPEED_MIN = 0.45;
 export const LEGACY_TARGET_SPEED_MAX = 1.8;
@@ -69,8 +55,14 @@ export const GAME_SETTING_KEYS = [
   'fpsMax',
   'responseCurve',
   'aimSlow',
+  'aimSlowConeAngle',
   'aimStickiness',
   'adsSnap',
+  'adsSnapRadius',
+  'adsSnapBlendMax',
+  'adsSnapPullSpeed',
+  'controllerVerticalSensitivityRatio',
+  'strafeAcceleration',
   'showDebugShapes',
   'targetHorizontalSpeedMin',
   'targetHorizontalSpeedMax',
@@ -82,10 +74,22 @@ export const GAME_SETTING_KEYS = [
   'targetVerticalOscillationSpeed',
   'targetStrafeAmount',
   'targetStrafeOscillationSpeed',
+  'targetFireIntervalMin',
+  'targetFireIntervalMax',
+  'targetProjectilesPerBurst',
+  'targetProjectileBurstSpread',
+  'targetInitialFireDelayMax',
+  'targetFireIntervalScaleMin',
+  'targetFireIntervalScaleMax',
+  'targetFireIntervalJitterMin',
+  'targetFireIntervalJitterMax',
+  'targetSpawnWidthFactor',
+  'targetGroundSpawnChance',
   'spawnDistanceMin',
   'spawnDistanceMax',
   'targetLifetimeMin',
   'targetLifetimeMax',
+  'enemyProjectileSpeed',
   'adsFovMultiplier',
   'adsSensitivityMultiplier',
   'hipFireSpreadPx',
@@ -100,6 +104,9 @@ export const GAME_SETTING_KEYS = [
 export const GUN_SETTING_KEYS = [
   'projectileRate',
   'bulletMagnetism',
+  'bulletMagnetismConeAngle',
+  'bodyShotDamage',
+  'headShotDamage',
   'recoilYStrength',
   'recoilVariance',
   'recoilHorizontalOscillationStrength',
@@ -117,11 +124,20 @@ export const DEFAULT_SETTINGS = {
   fov: 110,
   fpsMax: 0,
   responseCurve: 'linear',
+  strafeAcceleration: 14,
   projectileRate: 14,
   bulletMagnetism: 0,
+  bulletMagnetismConeAngle: 1,
+  bodyShotDamage: 1,
+  headShotDamage: 1.5,
   aimSlow: 0,
+  aimSlowConeAngle: 2,
   aimStickiness: 0,
   adsSnap: 0,
+  adsSnapRadius: 1,
+  adsSnapBlendMax: 0.9,
+  adsSnapPullSpeed: 14,
+  controllerVerticalSensitivityRatio: 0.75,
   showDebugShapes: true,
   recoilYStrength: 0.6,
   recoilVariance: 0.18,
@@ -139,10 +155,22 @@ export const DEFAULT_SETTINGS = {
   targetVerticalOscillationSpeed: 1.5,
   targetStrafeAmount: 0.9,
   targetStrafeOscillationSpeed: 1.8,
+  targetFireIntervalMin: 1.4,
+  targetFireIntervalMax: 2.6,
+  targetProjectilesPerBurst: 2,
+  targetProjectileBurstSpread: 0.35,
+  targetInitialFireDelayMax: 1.1,
+  targetFireIntervalScaleMin: 0.8,
+  targetFireIntervalScaleMax: 1.3,
+  targetFireIntervalJitterMin: 0.15,
+  targetFireIntervalJitterMax: 0.85,
+  targetSpawnWidthFactor: 0.14,
+  targetGroundSpawnChance: 0.3,
   spawnDistanceMin: 4,
   spawnDistanceMax: 36,
   targetLifetimeMin: 6,
   targetLifetimeMax: 9,
+  enemyProjectileSpeed: 72,
   adsFovMultiplier: 0.72,
   adsSensitivityMultiplier: 0.58,
   hipFireSpreadPx: 18,
