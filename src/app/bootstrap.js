@@ -155,10 +155,11 @@ export function bootstrapApp() {
       playerSystem.restartGame();
     }
     state.restartPressedLastFrame = input.restartPressed;
-    const aimSlowTarget = input.controllerAimAssistActive ? aimAssistSystem.getAimSlowTarget() : null;
 
     playerSystem.updateAimInputState(delta, input.adsPressed, input.shootPressed);
     playerSystem.applyPlayerMovement(input.moveX, delta);
+    sceneSystem.updateCamera();
+    const aimSlowTarget = input.controllerAimAssistActive ? aimAssistSystem.getAimSlowTarget() : null;
     aimAssistSystem.applyLookInput(
       input.controllerLookX,
       input.controllerLookY,

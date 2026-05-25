@@ -5,13 +5,14 @@ export function createDebugSystem({ scene, camera, settings, getCameraOrigin, ge
   const aimAssistGroup = new THREE.Group();
   scene.add(aimAssistGroup);
   let magnetismCone;
+  let aimSlowCone;
   let adsSnapCylinder;
   const spawnBoundsBox = createDebugBox(0x63c7ff);
   scene.add(spawnBoundsBox);
   let debugGeometryKey = '';
 
   function rebuildDebugGeometryIfNeeded() {
-    const nextKey = `${settings.projectileMaxDistance}|${settings.bulletMagnetismConeAngle}|${settings.adsSnapRadius}`;
+    const nextKey = `${settings.projectileMaxDistance}|${settings.bulletMagnetismConeAngle}|${settings.aimSlowConeAngle}|${settings.adsSnapRadius}`;
     if (nextKey === debugGeometryKey) {
       return;
     }
@@ -19,8 +20,10 @@ export function createDebugSystem({ scene, camera, settings, getCameraOrigin, ge
     aimAssistGroup.clear();
     const lineLength = settings.projectileMaxDistance;
     magnetismCone = createDebugCone(THREE.MathUtils.degToRad(settings.bulletMagnetismConeAngle), lineLength, 0xffb347);
+    aimSlowCone = createDebugCone(THREE.MathUtils.degToRad(settings.aimSlowConeAngle), lineLength, 0x7cff7c);
     adsSnapCylinder = createDebugCylinder(settings.adsSnapRadius, lineLength, 0xff4d6d);
     aimAssistGroup.add(magnetismCone);
+    aimAssistGroup.add(aimSlowCone);
     aimAssistGroup.add(adsSnapCylinder);
     debugGeometryKey = nextKey;
   }
@@ -32,6 +35,7 @@ export function createDebugSystem({ scene, camera, settings, getCameraOrigin, ge
     aimAssistGroup.quaternion.copy(camera.getWorldQuaternion(new THREE.Quaternion()));
     aimAssistGroup.visible = settings.showDebugShapes;
     magnetismCone.visible = settings.showDebugShapes && settings.bulletMagnetism > 0;
+    aimSlowCone.visible = settings.showDebugShapes && settings.aimSlow > 0;
     adsSnapCylinder.visible = settings.showDebugShapes && settings.adsSnap > 0 && isAdsSnapActive();
 
     const spawnBounds = getSpawnBounds();

@@ -65,7 +65,12 @@ export function createAimAssistSystem({ state, settings, camera, targets, raycas
   }
 
   function getAimSlowTarget() {
-    return getNearestTargetInCone(getCameraOrigin(), getCameraForward(), THREE.MathUtils.degToRad(settings.aimSlowConeAngle));
+    return getNearestTargetInCone(
+      getCameraOrigin(),
+      getCameraForward(),
+      THREE.MathUtils.degToRad(settings.aimSlowConeAngle),
+      { useTargetVolume: true }
+    );
   }
 
   function getTargetAimPoint(target, origin = getCameraOrigin(), direction = getCameraForward()) {
@@ -126,28 +131,37 @@ export function createAimAssistSystem({ state, settings, camera, targets, raycas
     ];
   }
 
-  function getNearestTargetInCone(origin, direction, maxAngle = THREE.MathUtils.degToRad(settings.bulletMagnetismConeAngle)) {
+  function getNearestTargetInCone(
+    origin,
+    direction,
+    maxAngle = THREE.MathUtils.degToRad(settings.bulletMagnetismConeAngle),
+    options = {}
+  ) {
     let nearestTarget = null;
     let nearestDistance = Number.POSITIVE_INFINITY;
     let nearestAngle = Number.POSITIVE_INFINITY;
     const normalizedDirection = direction.clone().normalize();
+    const useTargetVolume = options.useTargetVolume === true;
 
     for (const target of targets) {
-      const toTarget = getTargetAimPoint(target, origin, normalizedDirection).sub(origin);
-      const distance = toTarget.length();
-      if (distance <= 0.0001 || distance > settings.projectileMaxDistance) {
+      const coneMetrics = useTargetVolume
+        ? getTargetConeMetrics(target, origin, normalizedDirection)
+        : getTargetPointConeMetrics(target, origin, normalizedDirection);
+      if (!coneMetrics || coneMetrics.distance > settings.projectileMaxDistance) {
         continue;
       }
 
-      const angle = normalizedDirection.angleTo(toTarget.clone().normalize());
-      if (angle > maxAngle) {
+      if (coneMetrics.angle > maxAngle) {
         continue;
       }
 
-      if (distance < nearestDistance || (Math.abs(distance - nearestDistance) < 0.001 && angle < nearestAngle)) {
+      if (
+        coneMetrics.distance < nearestDistance ||
+        (Math.abs(coneMetrics.distance - nearestDistance) < 0.001 && coneMetrics.angle < nearestAngle)
+      ) {
         nearestTarget = target;
-        nearestDistance = distance;
-        nearestAngle = angle;
+        nearestDistance = coneMetrics.distance;
+        nearestAngle = coneMetrics.angle;
       }
     }
 
@@ -184,6 +198,20 @@ export function createAimAssistSystem({ state, settings, camera, targets, raycas
     }
 
     return nearestTarget;
+  }
+
+  function getTargetPointConeMetrics(target, origin, direction) {
+    const aimPoint = getTargetAimPoint(target, origin, direction);
+    const toTarget = aimPoint.sub(origin);
+    const distance = toTarget.length();
+    if (distance <= 0.0001) {
+      return null;
+    }
+
+    return {
+      distance,
+      angle: direction.angleTo(toTarget.clone().normalize())
+    };
   }
 
   function nudgeAimTowardTarget(target, amount, adjustPitch = true) {
@@ -224,6 +252,66 @@ export function createAimAssistSystem({ state, settings, camera, targets, raycas
 
 function getLocalOffsetSamplePoints(target, center, offsets) {
   return offsets.map((offset) => target.localToWorld(center.clone().add(offset)));
+}
+
+function getTargetConeMetrics(target, origin, direction) {
+  const body = target.userData.body;
+  const head = target.userData.head;
+  const bodyHalfWidth = (body.geometry.parameters.width * body.scale.x) / 2;
+  const bodyHalfHeight = (body.geometry.parameters.height * body.scale.y) / 2;
+  const bodyHalfDepth = (body.geometry.parameters.depth * body.scale.z) / 2;
+  const bodyRadius = Math.sqrt(
+    bodyHalfWidth * bodyHalfWidth +
+    bodyHalfHeight * bodyHalfHeight +
+    bodyHalfDepth * bodyHalfDepth
+  );
+  const headRadius = head.geometry.parameters.radius * head.scale.x;
+  const sphereMetrics = [
+    getSphereConeMetrics(target.localToWorld(body.position.clone()), bodyRadius, origin, direction),
+    getSphereConeMetrics(target.localToWorld(head.position.clone()), headRadius, origin, direction)
+  ].filter(Boolean);
+
+  if (sphereMetrics.length === 0) {
+    return null;
+  }
+
+  return sphereMetrics.reduce((bestMetrics, currentMetrics) => {
+    if (!bestMetrics) {
+      return currentMetrics;
+    }
+
+    if (currentMetrics.angle < bestMetrics.angle - 0.0001) {
+      return currentMetrics;
+    }
+
+    if (
+      Math.abs(currentMetrics.angle - bestMetrics.angle) < 0.0001 &&
+      currentMetrics.distance < bestMetrics.distance
+    ) {
+      return currentMetrics;
+    }
+
+    return bestMetrics;
+  }, null);
+}
+
+function getSphereConeMetrics(center, radius, origin, direction) {
+  const toCenter = center.clone().sub(origin);
+  const distance = toCenter.length();
+  if (distance <= 0.0001) {
+    return { distance: 0, angle: 0 };
+  }
+
+  const normalizedToCenter = toCenter.clone().normalize();
+  const centerAngle = direction.angleTo(normalizedToCenter);
+  const angularRadius = distance <= radius
+    ? Math.PI / 2
+    : Math.asin(THREE.MathUtils.clamp(radius / distance, 0, 1));
+
+  return {
+    distance: Math.max(0, distance - radius),
+    angle: Math.max(0, centerAngle - angularRadius)
+  };
 }
 
 function getHorizontalStickinessPoint(point, originY) {
