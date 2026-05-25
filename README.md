@@ -54,6 +54,16 @@ npm run lint
 npm run build
 ```
 
+## GitHub Pages
+
+This repository is configured to deploy to GitHub Pages from the `main` branch with GitHub Actions.
+
+1. In GitHub, open **Settings > Pages**.
+2. Set **Source** to **GitHub Actions**.
+3. Push to `main` and wait for the **Deploy GitHub Pages** workflow to finish.
+
+The Vite build is configured to serve from `/browser-controller-aim-trainer/`, which matches this repository's Pages URL.
+
 ## Controls
 
 Controller:
