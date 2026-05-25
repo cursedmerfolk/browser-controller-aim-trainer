@@ -24,7 +24,7 @@
         "adsSnapBlendMax": 0.9,
         "adsSnapPullSpeed": 14,
         "controllerVerticalSensitivityRatio": 0.75,
-        "showDebugShapes": true,
+        "showDebugShapes": false,
         "targetHorizontalSpeedMin": 0.25,
         "targetHorizontalSpeedMax": 1.75,
         "targetCount": 3,
