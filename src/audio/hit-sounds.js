@@ -56,24 +56,24 @@ export function createHitSoundController() {
     const filter = context.createBiquadFilter();
     const gain = context.createGain();
 
-    oscillator.type = 'triangle';
-    oscillator.frequency.setValueAtTime(1500, now);
-    oscillator.frequency.exponentialRampToValueAtTime(950, now + 0.05);
+    oscillator.type = 'square';
+    oscillator.frequency.setValueAtTime(2100, now);
+    oscillator.frequency.exponentialRampToValueAtTime(1250, now + 0.028);
 
     filter.type = 'bandpass';
-    filter.frequency.setValueAtTime(1200, now);
-    filter.Q.value = 2.5;
+    filter.frequency.setValueAtTime(1900, now);
+    filter.Q.value = 5.5;
 
     gain.gain.setValueAtTime(0.0001, now);
-    gain.gain.exponentialRampToValueAtTime(0.03, now + 0.004);
-    gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.06);
+    gain.gain.exponentialRampToValueAtTime(0.024, now + 0.002);
+    gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.032);
 
     oscillator.connect(filter);
     filter.connect(gain);
     gain.connect(context.destination);
 
     oscillator.start(now);
-    oscillator.stop(now + 0.065);
+    oscillator.stop(now + 0.036);
     oscillator.addEventListener('ended', () => {
       oscillator.disconnect();
       filter.disconnect();
