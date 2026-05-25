@@ -76,6 +76,7 @@ export function renderSettingsPanelMarkup({ settings, profileController }) {
             ${renderNumericControl({ id: 'ads-snap-radius', label: 'ADS snap radius', min: 0, max: 5, step: 0.05, value: settings.adsSnapRadius })}
             ${renderNumericControl({ id: 'ads-snap-blend-max', label: 'ADS snap blend max', min: 0, max: 1, step: 0.01, value: settings.adsSnapBlendMax })}
             ${renderNumericControl({ id: 'ads-snap-pull-speed', label: 'ADS snap pull speed', min: 1, max: 30, step: 0.1, value: settings.adsSnapPullSpeed })}
+            <strong>Target</strong>
             ${renderNumericControl({ id: 'spawn-distance-min', label: 'Spawn distance min', min: 1, max: 60, step: 0.5, value: settings.spawnDistanceMin })}
             ${renderNumericControl({ id: 'spawn-distance-max', label: 'Spawn distance max', min: 1, max: 120, step: 0.5, value: settings.spawnDistanceMax })}
             ${renderNumericControl({ id: 'target-spawn-width-factor', label: 'Spawn width factor', min: 0.02, max: 0.5, step: 0.01, value: settings.targetSpawnWidthFactor })}
@@ -107,8 +108,8 @@ export function renderSettingsPanelMarkup({ settings, profileController }) {
               ${renderNumericControl({ id: 'projectile-rate', label: 'Projectile rate', min: 1, max: 15, step: 0.5, value: settings.projectileRate })}
               ${renderNumericControl({ id: 'hip-fire-spray-radius', label: 'Hip fire spray radius', min: 0, max: 100, step: 0.5, value: settings.hipFireSprayRadius })}
               ${renderNumericControl({ id: 'bullet-magnetism', label: 'Bullet magnetism', min: 0, max: 3, step: 0.01, value: settings.bulletMagnetism })}
-              ${renderNumericControl({ id: 'recoil-y-strength', label: 'Recoil Y strength', min: 0.05, max: 2.5, step: 0.05, value: settings.recoilYStrength })}
-              ${renderNumericControl({ id: 'recoil-variance', label: 'Recoil variance', min: 0, max: 10, step: 0.05, value: settings.recoilVariance })}
+              ${renderNumericControl({ id: 'body-shot-damage', label: 'Body shot damage', min: 0.1, max: 10, step: 0.1, value: settings.bodyShotDamage })}
+              ${renderNumericControl({ id: 'head-shot-damage', label: 'Headshot damage', min: 0.1, max: 10, step: 0.1, value: settings.headShotDamage })}
             </div>
           `
         })}
@@ -118,8 +119,8 @@ export function renderSettingsPanelMarkup({ settings, profileController }) {
           collapsed: true,
           content: `
             ${renderNumericControl({ id: 'bullet-magnetism-cone-angle', label: 'Bullet magnetism cone angle', min: 0, max: 10, step: 0.1, value: settings.bulletMagnetismConeAngle })}
-            ${renderNumericControl({ id: 'body-shot-damage', label: 'Body shot damage', min: 0.1, max: 10, step: 0.1, value: settings.bodyShotDamage })}
-            ${renderNumericControl({ id: 'head-shot-damage', label: 'Headshot damage', min: 0.1, max: 10, step: 0.1, value: settings.headShotDamage })}
+            ${renderNumericControl({ id: 'recoil-y-strength', label: 'Recoil Y strength', min: 0.05, max: 2.5, step: 0.05, value: settings.recoilYStrength })}
+            ${renderNumericControl({ id: 'recoil-variance', label: 'Recoil variance', min: 0, max: 10, step: 0.05, value: settings.recoilVariance })}
             ${renderNumericControl({ id: 'recoil-horizontal-oscillation', label: 'Recoil horiz. oscillation', min: 0, max: 5, step: 0.05, value: settings.recoilHorizontalOscillationStrength })}
             ${renderNumericControl({ id: 'recoil-horizontal-oscillation-speed', label: 'Recoil horiz. osc. speed', min: 0.1, max: 3, step: 0.01, value: settings.recoilHorizontalOscillationSpeed })}
             ${renderNumericControl({ id: 'recoil-intensity-oscillator', label: 'Recoil intensity oscillator', min: 0, max: 1.5, step: 0.05, value: settings.recoilIntensityOscillator })}
