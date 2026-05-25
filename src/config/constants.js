@@ -105,6 +105,7 @@ export const GAME_SETTING_KEYS = [
 ];
 export const GUN_SETTING_KEYS = [
   'projectileRate',
+  'hipFireSprayRadius',
   'bulletMagnetism',
   'bulletMagnetismConeAngle',
   'bodyShotDamage',
@@ -128,6 +129,7 @@ export const DEFAULT_SETTINGS = {
   responseCurve: 'linear',
   strafeAcceleration: 14,
   projectileRate: 14,
+  hipFireSprayRadius: 18,
   bulletMagnetism: 0,
   bulletMagnetismConeAngle: 1,
   bodyShotDamage: 1,

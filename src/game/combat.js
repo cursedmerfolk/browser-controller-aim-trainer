@@ -61,7 +61,7 @@ export function createCombatSystem({
     state.hasPlayerFiredShot = true;
 
     const recoilPoint = getRecoilPoint(state.recoilShotIndex);
-    const shotOffset = getShotOffset(recoilPoint.clone());
+    const recoilOffset = getRecoilOffset(recoilPoint.clone());
     state.recoilShotIndex += 1;
 
     state.spreadKick = Math.min(state.spreadKick + (state.isAimingDownSights ? 0.35 : 1), 3);
@@ -79,7 +79,7 @@ export function createCombatSystem({
     applyAimRecoil(recoilPoint);
     updateCamera();
 
-    const shotDirection = getShotDirection(shotOffset);
+    const shotDirection = getShotDirection(recoilOffset);
     const shotOrigin = getCameraOrigin();
     raycaster.set(shotOrigin, shotDirection);
     const intersections = raycaster.intersectObjects(targets, true);
@@ -100,9 +100,12 @@ export function createCombatSystem({
     return raycaster.ray.origin.clone().add(raycaster.ray.direction.clone().multiplyScalar(settings.projectileMaxDistance));
   }
 
-  function getShotDirection(shotOffset) {
-    raycaster.setFromCamera(shotOffset, camera);
-    const baseDirection = raycaster.ray.direction.clone();
+  function getShotDirection(recoilOffset) {
+    raycaster.setFromCamera(recoilOffset, camera);
+    const recoilDirection = raycaster.ray.direction.clone();
+    const baseDirection = state.isAimingDownSights
+      ? recoilDirection
+      : getRandomDirectionInCone(recoilDirection, getHipFireSpreadConeAngle());
 
     if (settings.bulletMagnetism <= 0) {
       return baseDirection;
@@ -179,33 +182,48 @@ export function createCombatSystem({
     state.pitch = THREE.MathUtils.clamp(state.pitch + verticalKick, -0.85, 0.85);
   }
 
-  function getShotOffset(recoilPoint) {
+  function getRecoilOffset(recoilPoint) {
     if (state.isAimingDownSights) {
       return new THREE.Vector2(0, 0);
     }
 
-    const randomOffset = getRandomSpreadOffset();
     const recoilScale = THREE.MathUtils.lerp(0.0042, 0.0019, state.aimBlend);
-
-    return randomOffset.add(recoilPoint.multiplyScalar(recoilScale));
+    return recoilPoint.multiplyScalar(recoilScale);
   }
 
-  function getRandomSpreadOffset() {
-    const spread = getCurrentSpreadNdc();
-    const angle = Math.random() * Math.PI * 2;
-    const radius = Math.sqrt(Math.random()) * spread;
+  function getRandomDirectionInCone(direction, maxAngle) {
+    if (maxAngle <= 0) {
+      return direction.clone();
+    }
 
-    return new THREE.Vector2(Math.cos(angle) * radius, Math.sin(angle) * radius);
-  }
+    const normalizedDirection = direction.clone().normalize();
+    const phi = Math.random() * Math.PI * 2;
+    const cosTheta = THREE.MathUtils.lerp(1, Math.cos(maxAngle), Math.random());
+    const sinTheta = Math.sqrt(1 - cosTheta * cosTheta);
+    const referenceAxis = Math.abs(normalizedDirection.y) < 0.999
+      ? new THREE.Vector3(0, 1, 0)
+      : new THREE.Vector3(1, 0, 0);
+    const tangent = new THREE.Vector3().crossVectors(referenceAxis, normalizedDirection).normalize();
+    const bitangent = new THREE.Vector3().crossVectors(normalizedDirection, tangent).normalize();
 
-  function getCurrentSpreadNdc() {
-    const baseSpread = THREE.MathUtils.lerp(settings.hipFireSpreadNdc, settings.adsSpreadNdc, state.aimBlend);
-    return baseSpread + state.spreadKick * settings.shotSpreadKickNdc;
+    return normalizedDirection
+      .clone()
+      .multiplyScalar(cosTheta)
+      .addScaledVector(tangent, Math.cos(phi) * sinTheta)
+      .addScaledVector(bitangent, Math.sin(phi) * sinTheta)
+      .normalize();
   }
 
   function getCurrentSpreadPx() {
-    const baseSpread = THREE.MathUtils.lerp(settings.hipFireSpreadPx, settings.adsSpreadPx, state.aimBlend);
+    const baseSpread = THREE.MathUtils.lerp(settings.hipFireSprayRadius, settings.adsSpreadPx, state.aimBlend);
     return baseSpread + state.spreadKick * settings.shotSpreadKickPx;
+  }
+
+  function getHipFireSpreadConeAngle() {
+    const viewportHeight = Math.max(rendererDomElement.clientHeight || window.innerHeight, 1);
+    const spreadNdc = (getCurrentSpreadPx() * 2) / viewportHeight;
+    const halfVerticalFov = THREE.MathUtils.degToRad(camera.fov ?? 60) * 0.5;
+    return Math.atan(spreadNdc * Math.tan(halfVerticalFov));
   }
 
   function getRecoilPoint(shotIndex) {

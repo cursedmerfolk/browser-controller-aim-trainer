@@ -103,6 +103,7 @@ export function renderSettingsPanelMarkup({ settings, profileController }) {
             })}
             <div class="settings-section">
               ${renderNumericControl({ id: 'projectile-rate', label: 'Projectile rate', min: 1, max: 15, step: 0.5, value: settings.projectileRate })}
+              ${renderNumericControl({ id: 'hip-fire-spray-radius', label: 'Hip fire spray radius', min: 0, max: 100, step: 0.5, value: settings.hipFireSprayRadius })}
               ${renderNumericControl({ id: 'bullet-magnetism', label: 'Bullet magnetism', min: 0, max: 3, step: 0.01, value: settings.bulletMagnetism })}
               ${renderNumericControl({ id: 'recoil-y-strength', label: 'Recoil Y strength', min: 0.05, max: 2.5, step: 0.05, value: settings.recoilYStrength })}
               ${renderNumericControl({ id: 'recoil-variance', label: 'Recoil variance', min: 0, max: 10, step: 0.05, value: settings.recoilVariance })}
@@ -190,6 +191,7 @@ export function createSettingsPanelController({
     { id: 'fov', min: 50, max: 110, fallback: DEFAULT_SETTINGS.fov, onChange: (value) => { settings.fov = value; } },
     { id: 'fps-max', min: 0, max: 240, fallback: DEFAULT_SETTINGS.fpsMax, onChange: (value) => { settings.fpsMax = value; } },
     { id: 'projectile-rate', min: 1, max: 15, fallback: DEFAULT_SETTINGS.projectileRate, onChange: (value) => { settings.projectileRate = value; } },
+    { id: 'hip-fire-spray-radius', min: 0, max: 100, fallback: DEFAULT_SETTINGS.hipFireSprayRadius, onChange: (value) => { settings.hipFireSprayRadius = value; } },
     { id: 'bullet-magnetism', min: 0, max: 3, fallback: DEFAULT_SETTINGS.bulletMagnetism, onChange: (value) => { settings.bulletMagnetism = value; } },
     { id: 'aim-slow', min: 0, max: 1, fallback: DEFAULT_SETTINGS.aimSlow, onChange: (value) => { settings.aimSlow = value; } },
     {
@@ -672,6 +674,7 @@ export function createSettingsPanelController({
     setNumericControlValue('fov', settings.fov);
     setNumericControlValue('fps-max', settings.fpsMax);
     setNumericControlValue('projectile-rate', settings.projectileRate);
+    setNumericControlValue('hip-fire-spray-radius', settings.hipFireSprayRadius);
     setNumericControlValue('bullet-magnetism', settings.bulletMagnetism);
     setNumericControlValue('bullet-magnetism-cone-angle', settings.bulletMagnetismConeAngle);
     setNumericControlValue('body-shot-damage', settings.bodyShotDamage);

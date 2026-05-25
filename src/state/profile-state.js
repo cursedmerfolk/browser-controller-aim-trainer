@@ -491,6 +491,12 @@ function sanitizeGameSettings(rawSettings) {
 function sanitizeGunSettings(rawSettings) {
   return {
     projectileRate: clampSetting(rawSettings.projectileRate, 1, 15, DEFAULT_SETTINGS.projectileRate),
+    hipFireSprayRadius: clampSetting(
+      rawSettings.hipFireSprayRadius ?? rawSettings.hipFireSpreadPx,
+      0,
+      100,
+      DEFAULT_SETTINGS.hipFireSprayRadius
+    ),
     bulletMagnetism: clampSetting(rawSettings.bulletMagnetism, 0, 3, DEFAULT_SETTINGS.bulletMagnetism),
     bulletMagnetismConeAngle: clampSetting(
       rawSettings.bulletMagnetismConeAngle,
