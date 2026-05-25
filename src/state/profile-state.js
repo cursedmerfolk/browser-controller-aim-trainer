@@ -489,12 +489,6 @@ function sanitizeGunSettings(rawSettings) {
       10,
       DEFAULT_SETTINGS.bulletMagnetismConeAngle
     ),
-    bulletMagnetismRaycastConeAngle: clampSetting(
-      rawSettings.bulletMagnetismRaycastConeAngle,
-      0,
-      10,
-      DEFAULT_SETTINGS.bulletMagnetismRaycastConeAngle
-    ),
     bodyShotDamage: clampSetting(rawSettings.bodyShotDamage, 0.1, 10, DEFAULT_SETTINGS.bodyShotDamage),
     headShotDamage: clampSetting(rawSettings.headShotDamage, 0.1, 10, DEFAULT_SETTINGS.headShotDamage),
     recoilYStrength: clampSetting(

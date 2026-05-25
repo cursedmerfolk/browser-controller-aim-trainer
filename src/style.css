@@ -104,7 +104,6 @@ canvas {
 .settings-subsection {
   display: grid;
   gap: 8px;
-  margin-top: 4px;
   padding-top: 10px;
   border-top: 1px solid rgba(255, 255, 255, 0.12);
 }
@@ -114,15 +113,14 @@ canvas {
   gap: 8px;
 }
 
-.settings-group {
+.settings-accordion {
   display: grid;
-  gap: 8px;
+  gap: 10px;
 }
 
-.settings-group + .settings-group {
-  margin-top: 4px;
-  padding-top: 10px;
-  border-top: 1px solid rgba(255, 255, 255, 0.12);
+.settings-accordion > .settings-subsection:first-child {
+  padding-top: 0;
+  border-top: 0;
 }
 
 .settings-subsection.is-collapsed > .panel-content {
@@ -131,6 +129,10 @@ canvas {
 
 .settings-subsection .panel-header strong {
   font-size: 14px;
+}
+
+.settings-subsection > .panel-content {
+  padding-top: 4px;
 }
 
 .crosshair {

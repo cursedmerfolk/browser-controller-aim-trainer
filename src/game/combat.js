@@ -125,7 +125,7 @@ export function createCombatSystem({
     if (
       !allowAimAssist ||
       settings.bulletMagnetism <= 0 ||
-      settings.bulletMagnetismRaycastConeAngle <= 0
+      settings.bulletMagnetismConeAngle <= 0
     ) {
       return null;
     }
@@ -133,7 +133,7 @@ export function createCombatSystem({
     const target = getNearestTargetInCone(
       origin,
       direction,
-      THREE.MathUtils.degToRad(settings.bulletMagnetismRaycastConeAngle)
+      THREE.MathUtils.degToRad(settings.bulletMagnetismConeAngle)
     );
     if (!target) {
       return null;

@@ -10,30 +10,22 @@ import { clampSetting } from '../utils/math.js';
 
 export function renderSettingsPanelMarkup({ settings, profileController }) {
   return `
-    <div class="hud-panel settings-panel edge-panel is-collapsed" id="settings-panel" data-side="right">
+    <div class="hud-panel settings-panel" id="settings-panel" data-side="right">
       <div class="panel-header">
         <strong>Settings</strong>
-        <button
-          class="panel-toggle"
-          id="settings-panel-toggle"
-          type="button"
-          aria-expanded="false"
-          aria-label="Collapse Settings panel"
-        >
-          <span aria-hidden="true">˄</span>
-        </button>
       </div>
-      <div class="panel-content">
-        <div class="settings-group">
-          ${renderProfileSelect({
-            id: 'game-profile-select',
-            label: 'Game profile',
-            options: getProfileOptions(profileController.getGameProfiles()),
-            selectedValue: profileController.profileState.selectedGameProfileId,
-            createLabel: 'Create new game...'
-          })}
-          <div class="settings-section">
-            <strong>Game settings</strong>
+      <div class="panel-content settings-accordion">
+        ${renderAccordionSection({
+          id: 'game-profile-settings-section',
+          title: 'Game profile + settings',
+          content: `
+            ${renderProfileSelect({
+              id: 'game-profile-select',
+              label: 'Game profile',
+              options: getProfileOptions(profileController.getGameProfiles()),
+              selectedValue: profileController.profileState.selectedGameProfileId,
+              createLabel: 'Create new game...'
+            })}
             <div class="settings-section">
               <strong>Controller</strong>
               ${renderNumericControl({ id: 'sensitivity', label: 'Controller sensitivity', min: 1, max: 10, step: 0.1, value: settings.lookSensitivity })}
@@ -63,92 +55,76 @@ export function renderSettingsPanelMarkup({ settings, profileController }) {
               ${renderNumericControl({ id: 'target-projectiles-per-burst', label: 'Target projectiles per burst', min: 1, max: 8, step: 1, value: settings.targetProjectilesPerBurst })}
               ${renderNumericControl({ id: 'enemy-projectile-speed', label: 'Enemy projectile speed', min: 1, max: 200, step: 1, value: settings.enemyProjectileSpeed })}
             </div>
-          </div>
-          <div class="settings-subsection is-collapsed" id="game-advanced-settings-section">
-            <div class="panel-header">
-              <strong>Game advanced</strong>
-              <button
-                class="panel-toggle"
-                id="game-advanced-settings-toggle"
-                type="button"
-                aria-expanded="false"
-                aria-label="Expand Game advanced settings"
-              >
-                <span aria-hidden="true">˄</span>
-              </button>
-            </div>
-            <div class="panel-content">
-              ${renderNumericControl({ id: 'fps-max', label: 'FPS maximum (0 = uncapped)', min: 0, max: 240, step: 1, value: settings.fpsMax })}
-              ${renderNumericControl({ id: 'controller-vertical-sensitivity-ratio', label: 'Vertical sensitivity ratio', min: 0.1, max: 2, step: 0.01, value: settings.controllerVerticalSensitivityRatio })}
-              ${renderNumericControl({ id: 'strafe-acceleration', label: 'Strafe acceleration', min: 1, max: 30, step: 0.1, value: settings.strafeAcceleration })}
-              ${renderNumericControl({ id: 'aim-slow-cone-angle', label: 'Aim slow cone angle', min: 0, max: 10, step: 0.1, value: settings.aimSlowConeAngle })}
-              ${renderNumericControl({ id: 'ads-snap-radius', label: 'ADS snap radius', min: 0, max: 5, step: 0.05, value: settings.adsSnapRadius })}
-              ${renderNumericControl({ id: 'ads-snap-blend-max', label: 'ADS snap blend max', min: 0, max: 1, step: 0.01, value: settings.adsSnapBlendMax })}
-              ${renderNumericControl({ id: 'ads-snap-pull-speed', label: 'ADS snap pull speed', min: 1, max: 30, step: 0.1, value: settings.adsSnapPullSpeed })}
-              ${renderNumericControl({ id: 'target-spawn-y-variance', label: 'Target Y spawn variance', min: 0, max: 3, step: 0.05, value: settings.targetSpawnYVariance })}
-              ${renderNumericControl({ id: 'target-vertical-oscillation-amplitude', label: 'Target Y oscillation amp.', min: 0, max: 3, step: 0.05, value: settings.targetVerticalOscillationAmplitude })}
-              ${renderNumericControl({ id: 'target-vertical-oscillation-speed', label: 'Target Y oscillation speed', min: 0, max: 6, step: 0.05, value: settings.targetVerticalOscillationSpeed })}
-              ${renderNumericControl({ id: 'target-projectile-burst-spread', label: 'Target burst spread', min: 0, max: 3, step: 0.05, value: settings.targetProjectileBurstSpread })}
-              ${renderNumericControl({ id: 'target-initial-fire-delay-max', label: 'Target initial fire delay max', min: 0, max: 5, step: 0.05, value: settings.targetInitialFireDelayMax })}
-              ${renderNumericControl({ id: 'target-fire-interval-scale-min', label: 'Fire cadence scale min', min: 0.1, max: 3, step: 0.05, value: settings.targetFireIntervalScaleMin })}
-              ${renderNumericControl({ id: 'target-fire-interval-scale-max', label: 'Fire cadence scale max', min: 0.1, max: 3, step: 0.05, value: settings.targetFireIntervalScaleMax })}
-              ${renderNumericControl({ id: 'target-fire-interval-jitter-min', label: 'Fire jitter min', min: 0, max: 3, step: 0.05, value: settings.targetFireIntervalJitterMin })}
-              ${renderNumericControl({ id: 'target-fire-interval-jitter-max', label: 'Fire jitter max', min: 0, max: 3, step: 0.05, value: settings.targetFireIntervalJitterMax })}
-              ${renderNumericControl({ id: 'target-spawn-width-factor', label: 'Target spawn width factor', min: 0.02, max: 0.5, step: 0.01, value: settings.targetSpawnWidthFactor })}
-              ${renderNumericControl({ id: 'target-ground-spawn-chance', label: 'Target ground spawn chance', min: 0, max: 1, step: 0.01, value: settings.targetGroundSpawnChance })}
-            </div>
-          </div>
-        </div>
-        <div class="settings-group">
-          ${renderProfileSelect({
-            id: 'gun-profile-select',
-            label: 'Gun profile',
-            options: getProfileOptions(profileController.getGunProfilesForCurrentGame()),
-            selectedValue: profileController.profileState.selectedGunProfileId,
-            createLabel: 'Create new gun...'
-          })}
-          <div class="settings-section">
-            <strong>Gun settings</strong>
+          `
+        })}
+        ${renderAccordionSection({
+          id: 'game-advanced-settings-section',
+          title: 'Game advanced',
+          collapsed: true,
+          content: `
+            ${renderNumericControl({ id: 'fps-max', label: 'FPS maximum (0 = uncapped)', min: 0, max: 240, step: 1, value: settings.fpsMax })}
+            ${renderNumericControl({ id: 'controller-vertical-sensitivity-ratio', label: 'Vertical sensitivity ratio', min: 0.1, max: 2, step: 0.01, value: settings.controllerVerticalSensitivityRatio })}
+            ${renderNumericControl({ id: 'strafe-acceleration', label: 'Strafe acceleration', min: 1, max: 30, step: 0.1, value: settings.strafeAcceleration })}
+            ${renderNumericControl({ id: 'aim-slow', label: 'Aim slow', min: 0, max: 1, step: 0.01, value: settings.aimSlow })}
+            ${renderNumericControl({ id: 'aim-slow-cone-angle', label: 'Aim slow cone angle', min: 0, max: 10, step: 0.1, value: settings.aimSlowConeAngle })}
+            ${renderNumericControl({ id: 'aim-stickiness', label: 'Aim stickiness', min: 0, max: 1, step: 0.01, value: settings.aimStickiness })}
+            ${renderNumericControl({ id: 'ads-snap', label: 'ADS snap', min: 0, max: 1, step: 0.01, value: settings.adsSnap })}
+            ${renderNumericControl({ id: 'ads-snap-radius', label: 'ADS snap radius', min: 0, max: 5, step: 0.05, value: settings.adsSnapRadius })}
+            ${renderNumericControl({ id: 'ads-snap-blend-max', label: 'ADS snap blend max', min: 0, max: 1, step: 0.01, value: settings.adsSnapBlendMax })}
+            ${renderNumericControl({ id: 'ads-snap-pull-speed', label: 'ADS snap pull speed', min: 1, max: 30, step: 0.1, value: settings.adsSnapPullSpeed })}
+            ${renderNumericControl({ id: 'target-spawn-y-variance', label: 'Target Y spawn variance', min: 0, max: 3, step: 0.05, value: settings.targetSpawnYVariance })}
+            ${renderNumericControl({ id: 'target-vertical-oscillation-amplitude', label: 'Target Y oscillation amp.', min: 0, max: 3, step: 0.05, value: settings.targetVerticalOscillationAmplitude })}
+            ${renderNumericControl({ id: 'target-vertical-oscillation-speed', label: 'Target Y oscillation speed', min: 0, max: 6, step: 0.05, value: settings.targetVerticalOscillationSpeed })}
+            ${renderNumericControl({ id: 'target-projectile-burst-spread', label: 'Target burst spread', min: 0, max: 3, step: 0.05, value: settings.targetProjectileBurstSpread })}
+            ${renderNumericControl({ id: 'target-initial-fire-delay-max', label: 'Target initial fire delay max', min: 0, max: 5, step: 0.05, value: settings.targetInitialFireDelayMax })}
+            ${renderNumericControl({ id: 'target-fire-interval-scale-min', label: 'Fire cadence scale min', min: 0.1, max: 3, step: 0.05, value: settings.targetFireIntervalScaleMin })}
+            ${renderNumericControl({ id: 'target-fire-interval-scale-max', label: 'Fire cadence scale max', min: 0.1, max: 3, step: 0.05, value: settings.targetFireIntervalScaleMax })}
+            ${renderNumericControl({ id: 'target-fire-interval-jitter-min', label: 'Fire jitter min', min: 0, max: 3, step: 0.05, value: settings.targetFireIntervalJitterMin })}
+            ${renderNumericControl({ id: 'target-fire-interval-jitter-max', label: 'Fire jitter max', min: 0, max: 3, step: 0.05, value: settings.targetFireIntervalJitterMax })}
+            ${renderNumericControl({ id: 'target-spawn-width-factor', label: 'Target spawn width factor', min: 0.02, max: 0.5, step: 0.01, value: settings.targetSpawnWidthFactor })}
+            ${renderNumericControl({ id: 'target-ground-spawn-chance', label: 'Target ground spawn chance', min: 0, max: 1, step: 0.01, value: settings.targetGroundSpawnChance })}
+          `
+        })}
+        ${renderAccordionSection({
+          id: 'gun-profile-settings-section',
+          title: 'Gun profile + settings',
+          content: `
+            ${renderProfileSelect({
+              id: 'gun-profile-select',
+              label: 'Gun profile',
+              options: getProfileOptions(profileController.getGunProfilesForCurrentGame()),
+              selectedValue: profileController.profileState.selectedGunProfileId,
+              createLabel: 'Create new gun...'
+            })}
             <div class="settings-section">
-              <strong>Controller</strong>
               ${renderNumericControl({ id: 'projectile-rate', label: 'Projectile rate', min: 1, max: 15, step: 0.5, value: settings.projectileRate })}
               ${renderNumericControl({ id: 'bullet-magnetism', label: 'Bullet magnetism', min: 0, max: 3, step: 0.01, value: settings.bulletMagnetism })}
               ${renderNumericControl({ id: 'recoil-y-strength', label: 'Recoil Y strength', min: 0.05, max: 2.5, step: 0.05, value: settings.recoilYStrength })}
               ${renderNumericControl({ id: 'recoil-variance', label: 'Recoil variance', min: 0, max: 10, step: 0.05, value: settings.recoilVariance })}
             </div>
-          </div>
-          <div class="settings-subsection is-collapsed" id="gun-advanced-settings-section">
-            <div class="panel-header">
-              <strong>Gun advanced</strong>
-              <button
-                class="panel-toggle"
-                id="gun-advanced-settings-toggle"
-                type="button"
-                aria-expanded="false"
-                aria-label="Expand Gun advanced settings"
-              >
-                <span aria-hidden="true">˄</span>
-              </button>
+          `
+        })}
+        ${renderAccordionSection({
+          id: 'gun-advanced-settings-section',
+          title: 'Gun advanced',
+          collapsed: true,
+          content: `
+            ${renderNumericControl({ id: 'bullet-magnetism-cone-angle', label: 'Bullet magnetism cone angle', min: 0, max: 10, step: 0.1, value: settings.bulletMagnetismConeAngle })}
+            ${renderNumericControl({ id: 'body-shot-damage', label: 'Body shot damage', min: 0.1, max: 10, step: 0.1, value: settings.bodyShotDamage })}
+            ${renderNumericControl({ id: 'head-shot-damage', label: 'Headshot damage', min: 0.1, max: 10, step: 0.1, value: settings.headShotDamage })}
+            ${renderNumericControl({ id: 'recoil-horizontal-oscillation', label: 'Recoil horiz. oscillation', min: 0, max: 5, step: 0.05, value: settings.recoilHorizontalOscillationStrength })}
+            ${renderNumericControl({ id: 'recoil-horizontal-oscillation-speed', label: 'Recoil horiz. osc. speed', min: 0.1, max: 3, step: 0.01, value: settings.recoilHorizontalOscillationSpeed })}
+            ${renderNumericControl({ id: 'recoil-intensity-oscillator', label: 'Recoil intensity oscillator', min: 0, max: 1.5, step: 0.05, value: settings.recoilIntensityOscillator })}
+            ${renderNumericControl({ id: 'recoil-intensity-oscillation-speed', label: 'Recoil intensity osc. speed', min: 0.1, max: 2, step: 0.05, value: settings.recoilIntensityOscillationSpeed })}
+            <label class="checkbox-row" for="show-debug-shapes-input">
+              <input id="show-debug-shapes-input" type="checkbox" ${settings.showDebugShapes ? 'checked' : ''} />
+              <span>Show debug shapes</span>
+            </label>
+            <div class="button-row">
+              <button id="export-profile-button" type="button">Export profile JSON</button>
             </div>
-            <div class="panel-content">
-              ${renderNumericControl({ id: 'bullet-magnetism-cone-angle', label: 'Bullet magnetism cone angle', min: 0, max: 10, step: 0.1, value: settings.bulletMagnetismConeAngle })}
-              ${renderNumericControl({ id: 'bullet-magnetism-raycast-cone-angle', label: 'Magnetism raycast cone size', min: 0, max: 10, step: 0.1, value: settings.bulletMagnetismRaycastConeAngle })}
-              ${renderNumericControl({ id: 'body-shot-damage', label: 'Body shot damage', min: 0.1, max: 10, step: 0.1, value: settings.bodyShotDamage })}
-              ${renderNumericControl({ id: 'head-shot-damage', label: 'Headshot damage', min: 0.1, max: 10, step: 0.1, value: settings.headShotDamage })}
-              ${renderNumericControl({ id: 'recoil-horizontal-oscillation', label: 'Recoil horiz. oscillation', min: 0, max: 5, step: 0.05, value: settings.recoilHorizontalOscillationStrength })}
-              ${renderNumericControl({ id: 'recoil-horizontal-oscillation-speed', label: 'Recoil horiz. osc. speed', min: 0.1, max: 3, step: 0.01, value: settings.recoilHorizontalOscillationSpeed })}
-              ${renderNumericControl({ id: 'recoil-intensity-oscillator', label: 'Recoil intensity oscillator', min: 0, max: 1.5, step: 0.05, value: settings.recoilIntensityOscillator })}
-              ${renderNumericControl({ id: 'recoil-intensity-oscillation-speed', label: 'Recoil intensity osc. speed', min: 0.1, max: 2, step: 0.05, value: settings.recoilIntensityOscillationSpeed })}
-              <label class="checkbox-row" for="show-debug-shapes-input">
-                <input id="show-debug-shapes-input" type="checkbox" ${settings.showDebugShapes ? 'checked' : ''} />
-                <span>Show debug shapes</span>
-              </label>
-              <div class="button-row">
-                <button id="export-profile-button" type="button">Export profile JSON</button>
-              </div>
-            </div>
-          </div>
-        </div>
+          `
+        })}
       </div>
     </div>
   `;
@@ -157,7 +133,9 @@ export function renderSettingsPanelMarkup({ settings, profileController }) {
 export function getSettingsPanelElements(root = document) {
   return {
     settingsPanel: root.querySelector('#settings-panel'),
+    gameProfileSettingsSection: root.querySelector('#game-profile-settings-section'),
     gameAdvancedSettingsSection: root.querySelector('#game-advanced-settings-section'),
+    gunProfileSettingsSection: root.querySelector('#gun-profile-settings-section'),
     gunAdvancedSettingsSection: root.querySelector('#gun-advanced-settings-section'),
     gameProfileSelect: root.querySelector('#game-profile-select'),
     gunProfileSelect: root.querySelector('#gun-profile-select'),
@@ -178,9 +156,10 @@ export function createSettingsPanelController({
 }) {
   const panels = [
     hudElements.hudPanel,
-    elements.settingsPanel,
     hudElements.controlsPanel,
+    elements.gameProfileSettingsSection,
     elements.gameAdvancedSettingsSection,
+    elements.gunProfileSettingsSection,
     elements.gunAdvancedSettingsSection
   ].filter(Boolean);
 
@@ -461,13 +440,6 @@ export function createSettingsPanelController({
       onChange: (value) => { settings.bulletMagnetismConeAngle = value; }
     },
     {
-      id: 'bullet-magnetism-raycast-cone-angle',
-      min: 0,
-      max: 10,
-      fallback: DEFAULT_SETTINGS.bulletMagnetismRaycastConeAngle,
-      onChange: (value) => { settings.bulletMagnetismRaycastConeAngle = value; }
-    },
-    {
       id: 'body-shot-damage',
       min: 0.1,
       max: 10,
@@ -638,7 +610,6 @@ export function createSettingsPanelController({
     setNumericControlValue('projectile-rate', settings.projectileRate);
     setNumericControlValue('bullet-magnetism', settings.bulletMagnetism);
     setNumericControlValue('bullet-magnetism-cone-angle', settings.bulletMagnetismConeAngle);
-    setNumericControlValue('bullet-magnetism-raycast-cone-angle', settings.bulletMagnetismRaycastConeAngle);
     setNumericControlValue('body-shot-damage', settings.bodyShotDamage);
     setNumericControlValue('head-shot-damage', settings.headShotDamage);
     setNumericControlValue('aim-slow', settings.aimSlow);
@@ -686,6 +657,9 @@ export function createSettingsPanelController({
 function bindNumericSetting({ id, min, max, fallback, onChange, onStore }) {
   const rangeInput = document.querySelector(`#${id}-range`);
   const numberInput = document.querySelector(`#${id}-number`);
+  if (!rangeInput || !numberInput) {
+    throw new Error(`Missing numeric control for "${id}"`);
+  }
 
   const applyValue = (rawValue) => {
     const value = clampSetting(Number(rawValue), min, max, fallback);
@@ -773,6 +747,28 @@ function renderOptions(options, selectedValue) {
   return options
     .map((option) => `<option value="${option.value}" ${option.value === selectedValue ? 'selected' : ''}>${option.label}</option>`)
     .join('');
+}
+
+function renderAccordionSection({ id, title, content, collapsed = false }) {
+  return `
+    <div class="settings-subsection${collapsed ? ' is-collapsed' : ''}" id="${id}">
+      <div class="panel-header">
+        <strong>${title}</strong>
+        <button
+          class="panel-toggle"
+          id="${id}-toggle"
+          type="button"
+          aria-expanded="${String(!collapsed)}"
+          aria-label="${collapsed ? 'Expand' : 'Collapse'} ${title}"
+        >
+          <span aria-hidden="true">${getPanelToggleSymbol(collapsed)}</span>
+        </button>
+      </div>
+      <div class="panel-content">
+        ${content}
+      </div>
+    </div>
+  `;
 }
 
 function renderProfileOptions(options, selectedValue, createLabel) {
