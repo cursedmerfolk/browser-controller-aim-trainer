@@ -58,6 +58,8 @@ npm run build
 
 This repository is configured to deploy to GitHub Pages from the `main` branch with GitHub Actions.
 
+Live site: <https://cursedmerfolk.github.io/browser-controller-aim-trainer/>
+
 1. In GitHub, open **Settings > Pages**.
 2. Set **Source** to **GitHub Actions**.
 3. Push to `main` and wait for the **Deploy GitHub Pages** workflow to finish.
