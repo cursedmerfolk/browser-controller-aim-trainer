@@ -17,7 +17,7 @@
         "fpsMax": 120,
         "responseCurve": "exponential",
         "aimSlow": 1,
-        "aimSlowConeAngle": 2,
+        "aimSlowConeAngle": 0.5,
         "aimStickiness": 0.5,
         "adsSnap": 0.5,
         "adsSnapRadius": 1,
@@ -71,7 +71,7 @@
           "settings": {
             "projectileRate": 10,
             "hipFireSprayRadius": 30,
-            "bulletMagnetism": 1.5,
+            "bulletMagnetism": 0.5,
             "bulletMagnetismConeAngle": 2,
             "bodyShotDamage": 1,
             "headShotDamage": 1.5,
