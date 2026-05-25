@@ -83,7 +83,11 @@ export function bootstrapApp() {
     clearProjectiles: combatSystem.clearProjectiles,
     clearEnemyProjectiles: combatSystem.clearEnemyProjectiles
   });
-  const gamepadInput = createGamepadInput({ state, settings });
+  const gamepadInput = createGamepadInput({
+    state,
+    settings,
+    onUnlockAudio: hitSoundController.unlockAudioOnInteraction
+  });
   const mouseKeyboardInput = createMouseKeyboardInput({
     state,
     rendererDomElement: sceneSystem.renderer.domElement,
@@ -216,6 +220,7 @@ function createInitialState() {
     mouseShootPressed: false,
     mouseAdsToggled: false,
     damageFlash: 0,
+    hitConfirmFlash: 0,
     damageFlinch: 0,
     damageFlinchDirection: 1,
     restartPressedLastFrame: false,

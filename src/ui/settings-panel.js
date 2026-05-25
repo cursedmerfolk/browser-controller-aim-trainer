@@ -48,6 +48,7 @@ export function renderSettingsPanelMarkup({ settings, profileController }) {
               <strong>Target</strong>
               ${renderNumericControl({ id: 'target-speed-min', label: 'Min target speed', min: 0.1, max: 5, step: 0.05, value: settings.targetHorizontalSpeedMin })}
               ${renderNumericControl({ id: 'target-speed-max', label: 'Max target speed', min: 0.1, max: 5, step: 0.05, value: settings.targetHorizontalSpeedMax })}
+              ${renderNumericControl({ id: 'target-lifetime', label: 'Target lifetime', min: 1, max: 60, step: 0.1, value: getTargetLifetimeValue(settings) })}
               ${renderNumericControl({ id: 'target-strafe-amount', label: 'Target strafe amount', min: 0, max: 3, step: 0.05, value: settings.targetStrafeAmount })}
               ${renderNumericControl({ id: 'target-strafe-oscillation-speed', label: 'Target strafe zigzag speed', min: 0, max: 6, step: 0.05, value: settings.targetStrafeOscillationSpeed })}
               ${renderNumericControl({ id: 'target-fire-interval-min', label: 'Target fire interval min', min: 0.1, max: 10, step: 0.05, value: settings.targetFireIntervalMin })}
@@ -241,6 +242,17 @@ export function createSettingsPanelController({
           settings.targetHorizontalSpeedMin = value;
           setNumericControlValue('target-speed-min', value);
         }
+      }
+    },
+    {
+      id: 'target-lifetime',
+      min: 1,
+      max: 60,
+      fallback: getTargetLifetimeValue(DEFAULT_SETTINGS),
+      onChange: (value) => {
+        settings.targetLifetimeMin = value;
+        settings.targetLifetimeMax = value;
+        onResetTargets();
       }
     },
     {
@@ -621,6 +633,7 @@ export function createSettingsPanelController({
     setNumericControlValue('ads-snap-pull-speed', settings.adsSnapPullSpeed);
     setNumericControlValue('target-speed-min', settings.targetHorizontalSpeedMin);
     setNumericControlValue('target-speed-max', settings.targetHorizontalSpeedMax);
+    setNumericControlValue('target-lifetime', getTargetLifetimeValue(settings));
     setNumericControlValue('target-spawn-y-variance', settings.targetSpawnYVariance);
     setNumericControlValue('target-vertical-oscillation-amplitude', settings.targetVerticalOscillationAmplitude);
     setNumericControlValue('target-vertical-oscillation-speed', settings.targetVerticalOscillationSpeed);
@@ -747,6 +760,10 @@ function renderOptions(options, selectedValue) {
   return options
     .map((option) => `<option value="${option.value}" ${option.value === selectedValue ? 'selected' : ''}>${option.label}</option>`)
     .join('');
+}
+
+function getTargetLifetimeValue(settings) {
+  return Math.round(((settings.targetLifetimeMin + settings.targetLifetimeMax) / 2) * 10) / 10;
 }
 
 function renderAccordionSection({ id, title, content, collapsed = false }) {

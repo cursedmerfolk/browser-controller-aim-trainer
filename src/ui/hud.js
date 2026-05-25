@@ -35,6 +35,10 @@ export function renderHudMarkup({ gamepadName, playerMaxHealth }) {
       <span class="crosshair-tick crosshair-tick-right"></span>
       <span class="crosshair-tick crosshair-tick-bottom"></span>
       <span class="crosshair-tick crosshair-tick-left"></span>
+      <span class="hit-marker hit-marker-top-left"></span>
+      <span class="hit-marker hit-marker-top-right"></span>
+      <span class="hit-marker hit-marker-bottom-right"></span>
+      <span class="hit-marker hit-marker-bottom-left"></span>
     </div>
     <div class="damage-overlay" id="damage-overlay" aria-hidden="true"></div>
     <div class="game-over-overlay" id="game-over-overlay" aria-live="assertive" aria-hidden="true">
@@ -106,6 +110,7 @@ export function getHudElements(root = document) {
 
 export function updateCrosshair(hudElements, state, getCurrentSpreadPx) {
   hudElements.crosshair.style.setProperty('--gap', `${getCurrentSpreadPx().toFixed(1)}px`);
+  hudElements.crosshair.style.setProperty('--hit-opacity', state.hitConfirmFlash.toFixed(3));
   hudElements.crosshair.dataset.mode = state.isAimingDownSights ? 'ads' : 'hip';
   hudElements.damageOverlay.style.opacity = String(state.damageFlash * 0.16);
 }

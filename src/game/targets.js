@@ -72,6 +72,7 @@ export function createTargetSystem({ scene, camera, backWall, state, settings, p
 
   function applyHitToTarget(target, isHeadshot = false) {
     state.hits += 1;
+    state.hitConfirmFlash = 1;
     target.userData.health -= isHeadshot ? settings.headShotDamage : settings.bodyShotDamage;
     playHitTickSound();
 

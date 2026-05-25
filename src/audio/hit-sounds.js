@@ -1,6 +1,8 @@
 export function createHitSoundController() {
   const audioState = {
-    context: null
+    context: null,
+    hitTickBuffer: null,
+    hitTickBufferSampleRate: null
   };
 
   function getAudioContext() {
@@ -51,32 +53,17 @@ export function createHitSoundController() {
       return;
     }
 
-    const now = context.currentTime;
-    const oscillator = context.createOscillator();
-    const filter = context.createBiquadFilter();
+    const source = context.createBufferSource();
     const gain = context.createGain();
+    source.buffer = getHitTickBuffer(audioState, context);
 
-    oscillator.type = 'square';
-    oscillator.frequency.setValueAtTime(2100, now);
-    oscillator.frequency.exponentialRampToValueAtTime(1250, now + 0.028);
-
-    filter.type = 'bandpass';
-    filter.frequency.setValueAtTime(1900, now);
-    filter.Q.value = 5.5;
-
-    gain.gain.setValueAtTime(0.0001, now);
-    gain.gain.exponentialRampToValueAtTime(0.024, now + 0.002);
-    gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.032);
-
-    oscillator.connect(filter);
-    filter.connect(gain);
+    gain.gain.value = 0.9;
+    source.connect(gain);
     gain.connect(context.destination);
 
-    oscillator.start(now);
-    oscillator.stop(now + 0.036);
-    oscillator.addEventListener('ended', () => {
-      oscillator.disconnect();
-      filter.disconnect();
+    source.start();
+    source.addEventListener('ended', () => {
+      source.disconnect();
       gain.disconnect();
     });
   }
@@ -85,4 +72,48 @@ export function createHitSoundController() {
     unlockAudioOnInteraction,
     playHitTickSound
   };
+}
+
+function getHitTickBuffer(audioState, context) {
+  if (audioStateMatchesContext(audioState, context) && audioState.hitTickBuffer) {
+    return audioState.hitTickBuffer;
+  }
+
+  const durationSeconds = 0.075;
+  const frameCount = Math.ceil(context.sampleRate * durationSeconds);
+  const buffer = context.createBuffer(1, frameCount, context.sampleRate);
+  const channelData = buffer.getChannelData(0);
+  let previousNoise = 0;
+  let previousLowNoise = 0;
+  let smoothedLowNoise = 0;
+
+  for (let index = 0; index < frameCount; index += 1) {
+    const time = index / context.sampleRate;
+    const normalizedTime = time / durationSeconds;
+    const envelope =
+      Math.exp(-normalizedTime * 14) *
+      Math.min(1, time / 0.0012) *
+      Math.max(0, 1 - Math.max(0, time - 0.038) / 0.022);
+    const whiteNoise = Math.random() * 2 - 1;
+    const highPassedNoise = whiteNoise - previousNoise * 0.72;
+    previousNoise = whiteNoise;
+    const lowNoiseSource = Math.random() * 2 - 1;
+    const lowerPassedNoise = lowNoiseSource - previousLowNoise * 0.28;
+    previousLowNoise = lowNoiseSource;
+    smoothedLowNoise += (lowerPassedNoise - smoothedLowNoise) * 0.18;
+    const lowEnvelope =
+      Math.exp(-normalizedTime * 9) *
+      Math.min(1, time / 0.0018) *
+      Math.max(0, 1 - Math.max(0, time - 0.05) / 0.025);
+    const transient = time < 0.0035 ? (1 - time / 0.0035) * 0.3 * (Math.random() * 2 - 1) : 0;
+    channelData[index] = highPassedNoise * 0.72 * envelope + smoothedLowNoise * 0.58 * lowEnvelope + transient * envelope;
+  }
+
+  audioState.hitTickBuffer = buffer;
+  audioState.hitTickBufferSampleRate = context.sampleRate;
+  return buffer;
+}
+
+function audioStateMatchesContext(audioState, context) {
+  return audioState.hitTickBufferSampleRate === context.sampleRate;
 }

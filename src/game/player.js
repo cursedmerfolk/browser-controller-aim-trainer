@@ -33,6 +33,7 @@ export function createPlayerSystem({
     state.mouseShootPressed = false;
     state.mouseAdsToggled = false;
     state.damageFlash = 0;
+    state.hitConfirmFlash = 0;
     state.damageFlinch = 0;
     state.restartPressedLastFrame = false;
     state.strafeVelocityX = 0;
@@ -52,6 +53,7 @@ export function createPlayerSystem({
     state.spreadKick = Math.max(0, state.spreadKick - delta * 3.5);
     state.weaponKick = Math.max(0, state.weaponKick - delta * 6);
     state.damageFlash = Math.max(0, state.damageFlash - delta * 2.6);
+    state.hitConfirmFlash = Math.max(0, state.hitConfirmFlash - delta * 16);
     state.damageFlinch = Math.max(0, state.damageFlinch - delta * 6.5);
     state.recoilPatternX = THREE.MathUtils.lerp(state.recoilPatternX, 0, 1 - Math.exp(-delta * 10));
     state.recoilPatternY = THREE.MathUtils.lerp(state.recoilPatternY, 0, 1 - Math.exp(-delta * 8));

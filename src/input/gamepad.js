@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 
-export function createGamepadInput({ state, settings }) {
+export function createGamepadInput({ state, settings, onUnlockAudio = () => {} }) {
   function updateGamepadTimestamp(pad) {
     if (typeof pad.timestamp === 'number' && Number.isFinite(pad.timestamp) && pad.timestamp > 0) {
       state.gamepadTimestampMs = pad.timestamp;
@@ -102,6 +102,9 @@ export function createGamepadInput({ state, settings }) {
       shootPressed = getGamepadShootPressed(pad);
       adsPressed = getGamepadAdsPressed(pad);
       restartPressed = getGamepadRestartPressed(pad);
+      if (shootPressed || adsPressed || restartPressed) {
+        onUnlockAudio();
+      }
     } else {
       state.rawStickX = 0;
       state.rawStickY = 0;
