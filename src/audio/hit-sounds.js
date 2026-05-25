@@ -2,7 +2,9 @@ export function createHitSoundController() {
   const audioState = {
     context: null,
     hitTickBuffer: null,
-    hitTickBufferSampleRate: null
+    hitTickBufferSampleRate: null,
+    weaponShotBuffer: null,
+    weaponShotBufferSampleRate: null
   };
 
   function getAudioContext() {
@@ -47,6 +49,10 @@ export function createHitSoundController() {
     void playHitTickSoundAsync();
   }
 
+  function playWeaponShotSound() {
+    return;
+  }
+
   async function playHitTickSoundAsync() {
     const context = await ensureAudioReady();
     if (!context) {
@@ -70,7 +76,8 @@ export function createHitSoundController() {
 
   return {
     unlockAudioOnInteraction,
-    playHitTickSound
+    playHitTickSound,
+    playWeaponShotSound
   };
 }
 
