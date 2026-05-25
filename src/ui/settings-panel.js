@@ -127,6 +127,7 @@ export function renderSettingsPanelMarkup({ settings, profileController }) {
               <span>Show debug shapes</span>
             </label>
             <div class="button-row">
+              <button id="restore-defaults-button" type="button">Restore defaults</button>
               <button id="export-profile-button" type="button">Export profile JSON</button>
             </div>
           `
@@ -148,7 +149,8 @@ export function getSettingsPanelElements(root = document) {
     responseCurveInput: root.querySelector('#response-curve-input'),
     invertYInput: root.querySelector('#invert-y-input'),
     showDebugShapesInput: root.querySelector('#show-debug-shapes-input'),
-    exportProfileButton: root.querySelector('#export-profile-button')
+    exportProfileButton: root.querySelector('#export-profile-button'),
+    restoreDefaultsButton: root.querySelector('#restore-defaults-button')
   };
 }
 
@@ -588,6 +590,13 @@ export function createSettingsPanelController({
 
   elements.exportProfileButton.addEventListener('click', () => {
     profileController.downloadProfileStateExport();
+  });
+
+  elements.restoreDefaultsButton.addEventListener('click', () => {
+    profileController.restoreBundledDefaults();
+    syncProfileUi();
+    onResetTargets();
+    profileController.storeSettings();
   });
 
   hudElements.discoverControllerButton.addEventListener('click', () => {

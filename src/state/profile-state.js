@@ -127,6 +127,17 @@ export function createProfileStateController() {
     URL.revokeObjectURL(url);
   }
 
+  function restoreBundledDefaults() {
+    const bundledState = getBundledProfileState();
+
+    for (const bundledGameProfile of Object.values(bundledState.gameProfiles)) {
+      profileState.gameProfiles[bundledGameProfile.id] = bundledGameProfile;
+    }
+
+    profileState.selectedGameProfileId = bundledState.selectedGameProfileId;
+    profileState.selectedGunProfileId = bundledState.selectedGunProfileId;
+  }
+
   function getSerializableProfileState() {
     return {
       version: SETTINGS_STORAGE_VERSION,
@@ -161,7 +172,8 @@ export function createProfileStateController() {
     selectGunProfile,
     createGameProfile,
     createGunProfile,
-    downloadProfileStateExport
+    downloadProfileStateExport,
+    restoreBundledDefaults
   };
 }
 
