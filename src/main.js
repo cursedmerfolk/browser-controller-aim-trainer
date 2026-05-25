@@ -1,7 +1,9 @@
 import './style.css';
 import * as THREE from 'three';
+import bundledProfileState from './profiles/marathon-profile.json';
 
 const SETTINGS_STORAGE_KEY = 'browser-controller-aim-trainer.settings';
+const SETTINGS_EXPORT_STORAGE_KEY = 'browser-controller-aim-trainer.export';
 const SETTINGS_STORAGE_VERSION = 3;
 
 const RESPONSE_CURVE_OPTIONS = [
@@ -36,6 +38,7 @@ const TARGET_SPAWN_WIDTH_FACTOR = 0.14;
 const CENTER_SCREEN = new THREE.Vector2(0, 0);
 const AIM_SLOW_CONE_ANGLE = THREE.MathUtils.degToRad(2);
 const BULLET_MAGNETISM_CONE_ANGLE = THREE.MathUtils.degToRad(1);
+const CONTROLLER_VERTICAL_SENSITIVITY_RATIO = 0.75;
 const ADS_SNAP_CYLINDER_RADIUS = 1;
 const DEBUG_VISUAL_OFFSET = 0.2;
 const LEGACY_TARGET_SPEED_MIN = 0.45;
@@ -156,6 +159,7 @@ const DEFAULT_SETTINGS = {
 
 const profileState = loadProfileState();
 const SETTINGS = createSettingsProxy(profileState);
+publishProfileStateExport(true);
 
 const state = {
   score: 0,
@@ -167,6 +171,10 @@ const state = {
   isGameOver: false,
   activeGamepadIndex: null,
   gamepadName: 'No controller detected',
+  gamepadTimestampMs: null,
+  gamepadRenderDelayMs: null,
+  displayedGamepadRenderDelayMs: null,
+  lastGamepadDelayDisplayUpdateMs: 0,
   yaw: 0,
   pitch: 0,
   rawStickX: 0,
@@ -220,6 +228,7 @@ app.innerHTML = `
       <div id="score" class="hud-stat hud-stat-primary">Score: 0</div>
       <div id="status">Status: READY</div>
       <div id="raw-stick">Raw stick: X 0.00 | Y 0.00</div>
+      <div id="input-delay">Pad delay: n/a</div>
       <div class="button-row">
         <button id="reset-button" type="button">Restart</button>
       </div>
@@ -242,12 +251,6 @@ app.innerHTML = `
       </div>
       <div class="game-over-hint">Press Start, Enter, or Restart</div>
     </div>
-  </div>
-  <div class="hud-panel axis-legend" aria-live="polite">
-    <strong>World axes</strong>
-    <div>X+: right | X-: left</div>
-    <div>Y+: up | Y-: down</div>
-    <div>Z-: forward/range | Z+: behind player</div>
   </div>
   <div class="hud-panel settings-panel edge-panel is-collapsed" id="settings-panel" data-side="right">
     <div class="panel-header">
@@ -273,7 +276,7 @@ app.innerHTML = `
     <strong>Game settings</strong>
     ${renderNumericControl({
       id: 'sensitivity',
-      label: 'Sensitivity',
+      label: 'Controller sensitivity',
       min: 1,
       max: 10,
       step: 0.1,
@@ -433,7 +436,7 @@ app.innerHTML = `
       id: 'bullet-magnetism',
       label: 'Bullet magnetism',
       min: 0,
-      max: 1,
+      max: 3,
       step: 0.01,
       value: SETTINGS.bulletMagnetism
     })}
@@ -485,6 +488,9 @@ app.innerHTML = `
       step: 0.05,
       value: SETTINGS.recoilIntensityOscillationSpeed
     })}
+    <div class="button-row">
+      <button id="export-profile-button" type="button">Export profile JSON</button>
+    </div>
     </div>
   </div>
   <div class="hud-panel instructions edge-panel is-collapsed" id="controls-panel" data-side="left">
@@ -601,6 +607,7 @@ const hudElements = {
   misses: document.querySelector('#misses'),
   status: document.querySelector('#status'),
   rawStick: document.querySelector('#raw-stick'),
+  inputDelay: document.querySelector('#input-delay'),
   crosshair: document.querySelector('#crosshair'),
   damageOverlay: document.querySelector('#damage-overlay'),
   gameOverOverlay: document.querySelector('#game-over-overlay'),
@@ -613,6 +620,7 @@ const hudElements = {
   invertYInput: document.querySelector('#invert-y-input'),
   showDebugShapesInput: document.querySelector('#show-debug-shapes-input'),
   discoverControllerButton: document.querySelector('#discover-controller-button'),
+  exportProfileButton: document.querySelector('#export-profile-button'),
   resetButton: document.querySelector('#reset-button'),
   gameOverRestartButton: document.querySelector('#game-over-restart-button')
 };
@@ -626,6 +634,10 @@ window.addEventListener('gamepaddisconnected', (event) => {
   if (state.activeGamepadIndex === event.gamepad.index) {
     state.activeGamepadIndex = null;
     state.gamepadName = 'No controller detected';
+    state.gamepadTimestampMs = null;
+    state.gamepadRenderDelayMs = null;
+    state.displayedGamepadRenderDelayMs = null;
+    state.lastGamepadDelayDisplayUpdateMs = 0;
   }
 });
 
@@ -717,6 +729,10 @@ function restartGame() {
   state.damageFlinch = 0;
   state.restartPressedLastFrame = false;
   state.strafeVelocityX = 0;
+  state.gamepadTimestampMs = null;
+  state.gamepadRenderDelayMs = null;
+  state.displayedGamepadRenderDelayMs = null;
+  state.lastGamepadDelayDisplayUpdateMs = 0;
   camera.position.set(0, PLAYER_EYE_HEIGHT, 0);
   previousCameraOrigin.copy(camera.position);
   updateCamera();
@@ -730,6 +746,10 @@ hudElements.gameOverRestartButton.addEventListener('click', restartGame);
 
 hudElements.discoverControllerButton.addEventListener('click', () => {
   discoverController(true);
+});
+
+hudElements.exportProfileButton.addEventListener('click', () => {
+  downloadProfileStateExport();
 });
 
 bindNumericSetting({
@@ -805,7 +825,7 @@ bindNumericSetting({
 bindNumericSetting({
   id: 'bullet-magnetism',
   min: 0,
-  max: 1,
+  max: 3,
   fallback: DEFAULT_SETTINGS.bulletMagnetism,
   onChange: (value) => {
     SETTINGS.bulletMagnetism = value;
@@ -1024,6 +1044,7 @@ function loop(frameTime = 0) {
   const delta = Math.min(Math.max(elapsedMs, 0) / 1000, 0.1);
   state.lastFrameTime = frameTime;
   state.fps = delta > 0 ? (1 / delta) : 0;
+  updateFrameDecay(delta);
   const input = getInputState();
   if (state.isGameOver && input.restartPressed && !state.restartPressedLastFrame) {
     restartGame();
@@ -1031,7 +1052,7 @@ function loop(frameTime = 0) {
   state.restartPressedLastFrame = input.restartPressed;
   const aimSlowTarget = input.controllerAimAssistActive ? getAimSlowTarget() : null;
 
-  updateAimState(delta, input.adsPressed, input.shootPressed);
+  updateAimInputState(delta, input.adsPressed, input.shootPressed);
   applyPlayerMovement(input.moveX, delta);
   applyLookInput(input.controllerLookX, input.controllerLookY, delta, aimSlowTarget, input.controllerAimAssistActive);
   updateCamera();
@@ -1054,10 +1075,22 @@ function loop(frameTime = 0) {
   updateHud();
 
   renderer.render(scene, camera);
+  updateGamepadRenderDelay();
   requestAnimationFrame(loop);
 }
 
 function getInputState() {
+  const input = getActionInputState();
+  const mouseLook = consumeMouseLookInput();
+
+  return {
+    ...input,
+    mouseLookX: mouseLook.mouseLookX,
+    mouseLookY: mouseLook.mouseLookY
+  };
+}
+
+function getActionInputState() {
   let controllerLookX = 0;
   let controllerLookY = 0;
   let moveX = 0;
@@ -1071,6 +1104,7 @@ function getInputState() {
     usingGamepad = true;
     state.rawStickX = pad.axes[2] ?? 0;
     state.rawStickY = pad.axes[3] ?? 0;
+    updateGamepadTimestamp(pad);
 
     controllerLookX = processStickAxis(state.rawStickX);
     controllerLookY = processStickAxis(state.rawStickY);
@@ -1081,21 +1115,18 @@ function getInputState() {
   } else {
     state.rawStickX = 0;
     state.rawStickY = 0;
+    state.gamepadTimestampMs = null;
+    state.gamepadRenderDelayMs = null;
+    state.displayedGamepadRenderDelayMs = null;
+    state.lastGamepadDelayDisplayUpdateMs = 0;
   }
 
   if (keyboard.has('ArrowLeft') || keyboard.has('KeyA')) moveX -= 1;
   if (keyboard.has('ArrowRight') || keyboard.has('KeyD')) moveX += 1;
 
-  const mouseLookX = state.pendingMouseLookX;
-  const mouseLookY = state.pendingMouseLookY;
-  state.pendingMouseLookX = 0;
-  state.pendingMouseLookY = 0;
-
   return {
     controllerLookX,
     controllerLookY,
-    mouseLookX,
-    mouseLookY,
     moveX: THREE.MathUtils.clamp(moveX, -1, 1),
     shootPressed,
     adsPressed,
@@ -1103,6 +1134,39 @@ function getInputState() {
     usingGamepad,
     controllerAimAssistActive: usingGamepad
   };
+}
+
+function consumeMouseLookInput() {
+  const mouseLookX = state.pendingMouseLookX;
+  const mouseLookY = state.pendingMouseLookY;
+  state.pendingMouseLookX = 0;
+  state.pendingMouseLookY = 0;
+  return { mouseLookX, mouseLookY };
+}
+
+function updateGamepadTimestamp(pad) {
+  if (typeof pad.timestamp === 'number' && Number.isFinite(pad.timestamp) && pad.timestamp > 0) {
+    state.gamepadTimestampMs = pad.timestamp;
+    return;
+  }
+
+  state.gamepadTimestampMs = null;
+}
+
+function updateGamepadRenderDelay() {
+  if (state.gamepadTimestampMs === null) {
+    state.gamepadRenderDelayMs = null;
+    state.displayedGamepadRenderDelayMs = null;
+    state.lastGamepadDelayDisplayUpdateMs = 0;
+    return;
+  }
+
+  const now = performance.now();
+  state.gamepadRenderDelayMs = Math.max(0, now - state.gamepadTimestampMs);
+  if (now - state.lastGamepadDelayDisplayUpdateMs >= 1000) {
+    state.displayedGamepadRenderDelayMs = state.gamepadRenderDelayMs;
+    state.lastGamepadDelayDisplayUpdateMs = now;
+  }
 }
 
 function discoverController(showHint = false) {
@@ -1169,11 +1233,12 @@ function applyLookInput(lookX, lookY, delta, aimSlowTarget, usingControllerAim) 
     sensitivityMultiplier *= THREE.MathUtils.lerp(1, 0.25, SETTINGS.aimSlow);
   }
 
-  const lookSensitivity = SETTINGS.lookSensitivity * sensitivityMultiplier;
+  const horizontalLookSensitivity = SETTINGS.lookSensitivity * sensitivityMultiplier;
+  const verticalLookSensitivity = horizontalLookSensitivity * CONTROLLER_VERTICAL_SENSITIVITY_RATIO;
   const verticalLook = SETTINGS.invertY ? -lookY : lookY;
 
-  state.yaw -= lookX * lookSensitivity * delta;
-  state.pitch -= verticalLook * lookSensitivity * delta;
+  state.yaw -= lookX * horizontalLookSensitivity * delta;
+  state.pitch -= verticalLook * verticalLookSensitivity * delta;
   state.pitch = THREE.MathUtils.clamp(state.pitch, -0.85, 0.85);
 }
 
@@ -1191,16 +1256,18 @@ function applyMouseLookInput(mouseLookX, mouseLookY) {
   state.pitch = THREE.MathUtils.clamp(state.pitch, -0.85, 0.85);
 }
 
-function updateAimState(delta, adsPressed, shootPressed) {
-  state.isAimingDownSights = adsPressed;
-  state.aimBlend = THREE.MathUtils.lerp(state.aimBlend, adsPressed ? 1 : 0, 1 - Math.exp(-delta * 14));
+function updateFrameDecay(delta) {
   state.spreadKick = Math.max(0, state.spreadKick - delta * 3.5);
   state.weaponKick = Math.max(0, state.weaponKick - delta * 6);
   state.damageFlash = Math.max(0, state.damageFlash - delta * 2.6);
   state.damageFlinch = Math.max(0, state.damageFlinch - delta * 6.5);
   state.recoilPatternX = THREE.MathUtils.lerp(state.recoilPatternX, 0, 1 - Math.exp(-delta * 10));
   state.recoilPatternY = THREE.MathUtils.lerp(state.recoilPatternY, 0, 1 - Math.exp(-delta * 8));
+}
 
+function updateAimInputState(delta, adsPressed, shootPressed) {
+  state.isAimingDownSights = adsPressed;
+  state.aimBlend = THREE.MathUtils.lerp(state.aimBlend, adsPressed ? 1 : 0, 1 - Math.exp(-delta * 14));
   if (!shootPressed) {
     state.recoilShotIndex = 0;
   }
@@ -1961,6 +2028,8 @@ function updateCrosshair() {
 function updateHud() {
   const accuracy = state.shots === 0 ? 0 : Math.round((state.hits / state.shots) * 100);
   const misses = Math.max(0, state.shots - state.hits);
+  const gamepadDelay =
+    state.displayedGamepadRenderDelayMs === null ? 'n/a' : `${Math.round(state.displayedGamepadRenderDelayMs * 10) / 10}ms`;
 
   hudElements.gamepadStatus.textContent = `Controller: ${state.gamepadName}`;
   hudElements.framerate.textContent = `FPS: ${Math.round(state.fps)}`;
@@ -1971,6 +2040,7 @@ function updateHud() {
   hudElements.score.textContent = `Score: ${state.score}`;
   hudElements.status.textContent = state.isGameOver ? 'Status: LOST - press Restart' : 'Status: READY';
   hudElements.rawStick.textContent = `Raw stick: X ${state.rawStickX.toFixed(2)} | Y ${state.rawStickY.toFixed(2)}`;
+  hudElements.inputDelay.textContent = `Pad delay: ${gamepadDelay}`;
   hudElements.gameOverOverlay.classList.toggle('is-visible', state.isGameOver);
   hudElements.gameOverOverlay.setAttribute('aria-hidden', String(!state.isGameOver));
 }
@@ -2299,7 +2369,7 @@ function createSettingsProxy() {
 function loadProfileState() {
   const storedValue = window.localStorage.getItem(SETTINGS_STORAGE_KEY);
   if (!storedValue) {
-    return createDefaultProfileState(DEFAULT_SETTINGS);
+    return getBundledProfileState();
   }
 
   try {
@@ -2311,20 +2381,51 @@ function loadProfileState() {
     return createDefaultProfileState(getLegacyStoredSettingsMap(parsed));
   } catch (error) {
     console.error('Failed to parse stored controller settings.', error);
-    return createDefaultProfileState(DEFAULT_SETTINGS);
+    return getBundledProfileState();
   }
 }
 
 function storeSettings() {
-  window.localStorage.setItem(
-    SETTINGS_STORAGE_KEY,
-    JSON.stringify({
-      version: SETTINGS_STORAGE_VERSION,
-      selectedGameProfileId: profileState.selectedGameProfileId,
-      selectedGunProfileId: profileState.selectedGunProfileId,
-      gameProfiles: profileState.gameProfiles
-    })
-  );
+  window.localStorage.setItem(SETTINGS_STORAGE_KEY, getSerializedProfileState());
+  publishProfileStateExport();
+}
+
+function getBundledProfileState() {
+  return sanitizeProfileState(bundledProfileState);
+}
+
+function getSerializableProfileState() {
+  return {
+    version: SETTINGS_STORAGE_VERSION,
+    selectedGameProfileId: profileState.selectedGameProfileId,
+    selectedGunProfileId: profileState.selectedGunProfileId,
+    gameProfiles: profileState.gameProfiles
+  };
+}
+
+function getSerializedProfileState(spaces = 0) {
+  return JSON.stringify(getSerializableProfileState(), null, spaces);
+}
+
+function publishProfileStateExport(logToConsole = false) {
+  const serializedProfileState = getSerializedProfileState(2);
+  window.localStorage.setItem(SETTINGS_EXPORT_STORAGE_KEY, serializedProfileState);
+  window.__AIM_TRAINER_PROFILE_EXPORT__ = serializedProfileState;
+  if (logToConsole) {
+    console.info('Aim trainer profile JSON exported to window.__AIM_TRAINER_PROFILE_EXPORT__');
+  }
+}
+
+function downloadProfileStateExport() {
+  const serializedProfileState = getSerializedProfileState(2);
+  publishProfileStateExport();
+  const blob = new Blob([serializedProfileState], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = 'browser-controller-aim-trainer-profile.json';
+  link.click();
+  URL.revokeObjectURL(url);
 }
 
 function getLegacyStoredSettingsMap(parsed) {
@@ -2485,7 +2586,7 @@ function sanitizeGameSettings(rawSettings) {
 function sanitizeGunSettings(rawSettings) {
   return {
     projectileRate: clampSetting(rawSettings.projectileRate, 1, 15, DEFAULT_SETTINGS.projectileRate),
-    bulletMagnetism: clampSetting(rawSettings.bulletMagnetism, 0, 1, DEFAULT_SETTINGS.bulletMagnetism),
+    bulletMagnetism: clampSetting(rawSettings.bulletMagnetism, 0, 3, DEFAULT_SETTINGS.bulletMagnetism),
     recoilYStrength: clampSetting(
       rawSettings.recoilYStrength ?? rawSettings.recoilPatternStrength ?? rawSettings.sprayPatternStrength,
       0.05,

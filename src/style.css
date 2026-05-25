@@ -151,6 +151,10 @@ canvas {
   text-align: center;
 }
 
+.game-over-card .button-row {
+  justify-content: center;
+}
+
 .game-over-card strong {
   font-size: 28px;
 }
@@ -229,16 +233,6 @@ canvas {
   max-height: calc(100vh - 32px);
   overflow-y: auto;
   gap: 12px;
-}
-
-.axis-legend {
-position: fixed;
-right: 16px;
-bottom: 16px;
-max-width: min(320px, calc(100vw - 32px));
-font-size: 12px;
-line-height: 1.45;
-pointer-events: none;
 }
 
 .control-group {

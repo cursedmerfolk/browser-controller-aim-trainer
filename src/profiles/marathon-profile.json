@@ -1,0 +1,65 @@
+{
+  "version": 3,
+  "selectedGameProfileId": "marathon",
+  "selectedGunProfileId": "overrun-ar",
+  "gameProfiles": {
+    "marathon": {
+      "id": "marathon",
+      "name": "Marathon",
+      "settings": {
+        "lookSensitivity": 6,
+        "mouseSensitivity": 0.51,
+        "maxStrafeSpeed": 10.5,
+        "deadzone": 0.12,
+        "invertY": false,
+        "fov": 110,
+        "fpsMax": 120,
+        "responseCurve": "exponential",
+        "aimSlow": 1,
+        "aimStickiness": 0.5,
+        "adsSnap": 0.5,
+        "showDebugShapes": false,
+        "targetHorizontalSpeedMin": 0.25,
+        "targetHorizontalSpeedMax": 1.75,
+        "targetCount": 3,
+        "targetRadius": 0.45,
+        "targetMaxHealth": 12,
+        "targetSpawnYVariance": 3,
+        "targetVerticalOscillationAmplitude": 1.05,
+        "targetVerticalOscillationSpeed": 0.95,
+        "targetStrafeAmount": 2.15,
+        "targetStrafeOscillationSpeed": 2.95,
+        "spawnDistanceMin": 4,
+        "spawnDistanceMax": 36,
+        "targetLifetimeMin": 6,
+        "targetLifetimeMax": 9,
+        "adsFovMultiplier": 0.72,
+        "adsSensitivityMultiplier": 0.58,
+        "hipFireSpreadPx": 18,
+        "adsSpreadPx": 6,
+        "hipFireSpreadNdc": 0.018,
+        "adsSpreadNdc": 0.0035,
+        "shotSpreadKickPx": 4.5,
+        "shotSpreadKickNdc": 0.0055,
+        "projectileSpeed": 260,
+        "projectileMaxDistance": 40
+      },
+      "gunProfiles": {
+        "overrun-ar": {
+          "id": "overrun-ar",
+          "name": "Overrun AR",
+          "settings": {
+            "projectileRate": 10,
+            "bulletMagnetism": 1,
+            "recoilYStrength": 0.5,
+            "recoilVariance": 0.5,
+            "recoilHorizontalOscillationStrength": 1,
+            "recoilHorizontalOscillationSpeed": 0.33,
+            "recoilIntensityOscillator": 0.9,
+            "recoilIntensityOscillationSpeed": 0.95
+          }
+        }
+      }
+    }
+  }
+}
