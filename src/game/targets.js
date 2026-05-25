@@ -192,12 +192,14 @@ export function createTargetSystem({ scene, camera, backWall, state, settings, p
   function updateTargets(delta) {
     for (const target of targets) {
       target.userData.age += delta;
-      target.userData.fireCooldown = Math.max(0, target.userData.fireCooldown - delta);
+      if (state.hasPlayerFiredShot) {
+        target.userData.fireCooldown = Math.max(0, target.userData.fireCooldown - delta);
+      }
       target.userData.basePosition.addScaledVector(target.userData.horizontalVelocity, delta);
       target.userData.basePosition.y = Math.max(target.userData.basePosition.y, target.userData.feetClearance);
       updateTargetPosition(target);
 
-      if (!state.isGameOver && target.userData.fireCooldown <= 0) {
+      if (!state.isGameOver && state.hasPlayerFiredShot && target.userData.fireCooldown <= 0) {
         for (let burstIndex = 0; burstIndex < settings.targetProjectilesPerBurst; burstIndex += 1) {
           const burstCenterOffset = burstIndex - (settings.targetProjectilesPerBurst - 1) / 2;
           fireTargetProjectile(target, burstCenterOffset * settings.targetProjectileBurstSpread);

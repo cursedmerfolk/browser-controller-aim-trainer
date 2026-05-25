@@ -24,6 +24,7 @@ export function createPlayerSystem({
     state.spreadKick = 0;
     state.weaponKick = 0;
     state.fireCooldown = 0;
+    state.hasPlayerFiredShot = false;
     state.recoilShotIndex = 0;
     state.recoilPatternX = 0;
     state.recoilPatternY = 0;

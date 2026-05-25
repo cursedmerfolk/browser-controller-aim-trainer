@@ -226,6 +226,7 @@ function createInitialState() {
     spreadKick: 0,
     weaponKick: 0,
     fireCooldown: 0,
+    hasPlayerFiredShot: false,
     recoilShotIndex: 0,
     recoilPatternX: 0,
     recoilPatternY: 0

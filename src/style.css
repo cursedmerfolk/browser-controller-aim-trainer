@@ -101,6 +101,38 @@ canvas {
   display: none;
 }
 
+.settings-subsection {
+  display: grid;
+  gap: 8px;
+  margin-top: 4px;
+  padding-top: 10px;
+  border-top: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+.settings-section {
+  display: grid;
+  gap: 8px;
+}
+
+.settings-group {
+  display: grid;
+  gap: 8px;
+}
+
+.settings-group + .settings-group {
+  margin-top: 4px;
+  padding-top: 10px;
+  border-top: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+.settings-subsection.is-collapsed > .panel-content {
+  display: none;
+}
+
+.settings-subsection .panel-header strong {
+  font-size: 14px;
+}
+
 .crosshair {
   --gap: 18px;
   --tick-length: 12px;

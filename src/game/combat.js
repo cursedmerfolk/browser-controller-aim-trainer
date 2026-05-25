@@ -58,6 +58,7 @@ export function createCombatSystem({
 
   function fireShot(allowAimAssist) {
     state.shots += 1;
+    state.hasPlayerFiredShot = true;
 
     const recoilPoint = getRecoilPoint(state.recoilShotIndex);
     const shotOffset = getShotOffset(recoilPoint.clone());
@@ -79,13 +80,17 @@ export function createCombatSystem({
     updateCamera();
 
     const shotDirection = getShotDirection(shotOffset, allowAimAssist);
-    raycaster.set(getCameraOrigin(), shotDirection);
+    const shotOrigin = getCameraOrigin();
+    raycaster.set(shotOrigin, shotDirection);
     const intersections = raycaster.intersectObjects(targets, true);
-    const hitPoint = intersections[0]?.point ?? getMissPoint();
+    const magnetismRaycastHit = intersections[0] ? null : getMagnetismRaycastHit(shotOrigin, shotDirection, allowAimAssist);
+    const hitPoint = intersections[0]?.point ?? magnetismRaycastHit?.hitPoint ?? getMissPoint();
 
     if (intersections.length > 0) {
       const hitObject = intersections[0].object;
       applyHitToTarget(getTargetRoot(hitObject), hitObject === getTargetRoot(hitObject).userData.head);
+    } else if (magnetismRaycastHit) {
+      applyHitToTarget(magnetismRaycastHit.target, magnetismRaycastHit.isHeadshot);
     }
 
     createProjectileVisual(getProjectileStart(), hitPoint);
@@ -114,6 +119,57 @@ export function createCombatSystem({
 
     const magnetizedDirection = getTargetAimPoint(magnetismTarget).sub(getCameraOrigin()).normalize();
     return baseDirection.addScaledVector(magnetizedDirection, settings.bulletMagnetism).normalize();
+  }
+
+  function getMagnetismRaycastHit(origin, direction, allowAimAssist) {
+    if (
+      !allowAimAssist ||
+      settings.bulletMagnetism <= 0 ||
+      settings.bulletMagnetismRaycastConeAngle <= 0
+    ) {
+      return null;
+    }
+
+    const target = getNearestTargetInCone(
+      origin,
+      direction,
+      THREE.MathUtils.degToRad(settings.bulletMagnetismRaycastConeAngle)
+    );
+    if (!target) {
+      return null;
+    }
+
+    const hitCandidates = [
+      {
+        hitPoint: target.localToWorld(target.userData.head.position.clone()),
+        isHeadshot: true
+      },
+      {
+        hitPoint: target.localToWorld(target.userData.body.position.clone()),
+        isHeadshot: false
+      }
+    ];
+    let bestHit = null;
+    let bestAngle = Number.POSITIVE_INFINITY;
+    let bestDistance = Number.POSITIVE_INFINITY;
+    const normalizedDirection = direction.clone().normalize();
+
+    for (const candidate of hitCandidates) {
+      const toHitPoint = candidate.hitPoint.clone().sub(origin);
+      const distance = toHitPoint.length();
+      if (distance <= 0.0001) {
+        continue;
+      }
+
+      const angle = normalizedDirection.angleTo(toHitPoint.clone().normalize());
+      if (angle < bestAngle || (Math.abs(angle - bestAngle) < 0.0001 && distance < bestDistance)) {
+        bestHit = candidate;
+        bestAngle = angle;
+        bestDistance = distance;
+      }
+    }
+
+    return bestHit ? { ...bestHit, target } : null;
   }
 
   function applyAimRecoil(recoilPoint) {
