@@ -198,7 +198,8 @@ export function createCombatSystem({
 
     const normalizedDirection = direction.clone().normalize();
     const phi = Math.random() * Math.PI * 2;
-    const cosTheta = THREE.MathUtils.lerp(1, Math.cos(maxAngle), Math.random());
+    const centerWeightedConeFactor = Math.pow(Math.random(), 1.8);
+    const cosTheta = THREE.MathUtils.lerp(1, Math.cos(maxAngle), centerWeightedConeFactor);
     const sinTheta = Math.sqrt(1 - cosTheta * cosTheta);
     const referenceAxis = Math.abs(normalizedDirection.y) < 0.999
       ? new THREE.Vector3(0, 1, 0)
