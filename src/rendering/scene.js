@@ -1,6 +1,8 @@
 import * as THREE from 'three';
 import { MUZZLE_SCALE, PLAYER_EYE_HEIGHT } from '../config/constants.js';
 
+const FLOOR_VISUAL_OFFSET = 0.16;
+
 export function createSceneSystem({ app, settings, state }) {
   const renderer = new THREE.WebGLRenderer({ antialias: true });
   renderer.setPixelRatio(window.devicePixelRatio);
@@ -32,7 +34,6 @@ export function createSceneSystem({ app, settings, state }) {
     new THREE.MeshStandardMaterial({ map: floorTexture, roughness: 0.82 })
   );
   floor.rotation.x = -Math.PI / 2;
-  floor.position.y = -0.12;
   floor.position.z = -64;
   floor.receiveShadow = true;
   scene.add(floor);
@@ -63,6 +64,7 @@ export function createSceneSystem({ app, settings, state }) {
   }
 
   function updateCamera() {
+    floor.position.y = settings.targetSpawnFloor - FLOOR_VISUAL_OFFSET;
     camera.rotation.order = 'YXZ';
     const flinchProgress = 1 - state.damageFlinch;
     const flinchYaw = Math.sin(flinchProgress * Math.PI * 3) * 0.014 * state.damageFlinchDirection * state.damageFlinch;

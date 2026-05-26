@@ -386,6 +386,7 @@ function sanitizeGameSettings(rawSettings) {
   );
   const spawnDistanceMin = clampSetting(rawSettings.spawnDistanceMin, 1, 60, DEFAULT_SETTINGS.spawnDistanceMin);
   const spawnDistanceMax = clampSetting(rawSettings.spawnDistanceMax, spawnDistanceMin, 120, DEFAULT_SETTINGS.spawnDistanceMax);
+  const targetSpawnFloor = clampSetting(rawSettings.targetSpawnFloor, -4, 12, DEFAULT_SETTINGS.targetSpawnFloor);
 
   return {
     lookSensitivity: clampSetting(rawSettings.lookSensitivity, 1, 10, DEFAULT_SETTINGS.lookSensitivity),
@@ -424,7 +425,13 @@ function sanitizeGameSettings(rawSettings) {
     targetHeight: clampSetting(rawSettings.targetHeight, 0.3, 4, DEFAULT_SETTINGS.targetHeight),
     targetRadius: clampSetting(rawSettings.targetRadius, 0.1, 2, DEFAULT_SETTINGS.targetRadius),
     targetMaxHealth: clampSetting(rawSettings.targetMaxHealth, 1, 100, DEFAULT_SETTINGS.targetMaxHealth),
-    targetSpawnYVariance: clampSetting(rawSettings.targetSpawnYVariance, 0, 3, DEFAULT_SETTINGS.targetSpawnYVariance),
+    targetSpawnFloor,
+    targetSpawnYVariance: clampSetting(
+      rawSettings.targetSpawnYVariance,
+      targetSpawnFloor,
+      12,
+      Math.max(DEFAULT_SETTINGS.targetSpawnYVariance, targetSpawnFloor)
+    ),
     targetVerticalOscillationAmplitude: clampSetting(
       rawSettings.targetVerticalOscillationAmplitude,
       0,

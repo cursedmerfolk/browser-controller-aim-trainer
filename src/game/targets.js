@@ -9,8 +9,6 @@ import {
 } from '../config/constants.js';
 import { getTriangleWave, randomRange } from '../utils/math.js';
 
-const TARGET_FEET_CLEARANCE = 0.04;
-
 export function createTargetSystem({ scene, camera, backWall, state, settings, playHitTickSound }) {
   const targets = [];
   const targetBodyGeometry = new THREE.BoxGeometry(0.36, TARGET_BODY_BASE_HEIGHT, 0.36);
@@ -61,7 +59,7 @@ export function createTargetSystem({ scene, camera, backWall, state, settings, p
     target.userData.head = head;
     target.userData.fireIntervalScale = settings.targetFireIntervalScaleMin;
     target.userData.strafePhase = 0;
-    target.userData.feetClearance = TARGET_FEET_CLEARANCE;
+    target.userData.feetClearance = settings.targetSpawnFloor;
     target.userData.verticalOscillationPhase = 0;
     target.userData.fireCooldown = 0;
     target.userData.material = material;
@@ -112,6 +110,7 @@ export function createTargetSystem({ scene, camera, backWall, state, settings, p
     target.userData.strafePhase = randomRange(0, Math.PI * 2);
     target.userData.health = target.userData.maxHealth;
     target.userData.totalHeight = settings.targetHeight + settings.targetWidth;
+    target.userData.feetClearance = settings.targetSpawnFloor;
 
     const bodyWidthScale = settings.targetWidth / 0.36;
     const bodyHeightScale = settings.targetHeight / TARGET_BODY_BASE_HEIGHT;
@@ -136,8 +135,8 @@ export function createTargetSystem({ scene, camera, backWall, state, settings, p
     return {
       minX: spawnBoxCenterX - spawnBoxHalfWidth,
       maxX: spawnBoxCenterX + spawnBoxHalfWidth,
-      minY: TARGET_FEET_CLEARANCE,
-      maxY: TARGET_FEET_CLEARANCE + settings.targetSpawnYVariance,
+      minY: settings.targetSpawnFloor,
+      maxY: settings.targetSpawnYVariance,
       minZ: camera.position.z - settings.spawnDistanceMax,
       maxZ: camera.position.z - settings.spawnDistanceMin
     };

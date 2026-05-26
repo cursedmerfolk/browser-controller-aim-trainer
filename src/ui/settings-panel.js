@@ -77,10 +77,11 @@ export function renderSettingsPanelMarkup({ settings, profileController }) {
             ${renderNumericControl({ id: 'ads-snap-blend-max', label: 'ADS snap blend max', min: 0, max: 1, step: 0.01, value: settings.adsSnapBlendMax })}
             ${renderNumericControl({ id: 'ads-snap-pull-speed', label: 'ADS snap pull speed', min: 1, max: 30, step: 0.1, value: settings.adsSnapPullSpeed })}
             <strong>Target</strong>
+            ${renderNumericControl({ id: 'target-spawn-floor', label: 'Spawn floor', min: -4, max: 12, step: 0.05, value: settings.targetSpawnFloor })}
             ${renderNumericControl({ id: 'spawn-distance-min', label: 'Spawn distance min', min: 1, max: 60, step: 0.5, value: settings.spawnDistanceMin })}
             ${renderNumericControl({ id: 'spawn-distance-max', label: 'Spawn distance max', min: 1, max: 120, step: 0.5, value: settings.spawnDistanceMax })}
             ${renderNumericControl({ id: 'target-spawn-width-factor', label: 'Spawn width factor', min: 0.02, max: 0.5, step: 0.01, value: settings.targetSpawnWidthFactor })}
-            ${renderNumericControl({ id: 'target-spawn-y-variance', label: 'Spawn height max', min: 0, max: 3, step: 0.05, value: settings.targetSpawnYVariance })}
+            ${renderNumericControl({ id: 'target-spawn-y-variance', label: 'Spawn height max', min: -4, max: 12, step: 0.05, value: settings.targetSpawnYVariance })}
             ${renderNumericControl({ id: 'target-vertical-oscillation-amplitude', label: 'Target Y oscillation amp.', min: 0, max: 3, step: 0.05, value: settings.targetVerticalOscillationAmplitude })}
             ${renderNumericControl({ id: 'target-vertical-oscillation-speed', label: 'Target Y oscillation speed', min: 0, max: 6, step: 0.05, value: settings.targetVerticalOscillationSpeed })}
             ${renderNumericControl({ id: 'target-projectile-burst-spread', label: 'Target burst spread', min: 0, max: 3, step: 0.05, value: settings.targetProjectileBurstSpread })}
@@ -287,6 +288,20 @@ export function createSettingsPanelController({
       }
     },
     {
+      id: 'target-spawn-floor',
+      min: -4,
+      max: 12,
+      fallback: DEFAULT_SETTINGS.targetSpawnFloor,
+      onChange: (value) => {
+        settings.targetSpawnFloor = value;
+        if (settings.targetSpawnYVariance < value) {
+          settings.targetSpawnYVariance = value;
+          setNumericControlValue('target-spawn-y-variance', value);
+        }
+        onResetTargets();
+      }
+    },
+    {
       id: 'spawn-distance-min',
       min: 1,
       max: 60,
@@ -316,11 +331,15 @@ export function createSettingsPanelController({
     },
     {
       id: 'target-spawn-y-variance',
-      min: 0,
-      max: 3,
+      min: -4,
+      max: 12,
       fallback: DEFAULT_SETTINGS.targetSpawnYVariance,
       onChange: (value) => {
         settings.targetSpawnYVariance = value;
+        if (settings.targetSpawnFloor > value) {
+          settings.targetSpawnFloor = value;
+          setNumericControlValue('target-spawn-floor', value);
+        }
         onResetTargets();
       }
     },
@@ -703,6 +722,7 @@ export function createSettingsPanelController({
     setNumericControlValue('target-speed-min', settings.targetHorizontalSpeedMin);
     setNumericControlValue('target-speed-max', settings.targetHorizontalSpeedMax);
     setNumericControlValue('target-lifetime', getTargetLifetimeValue(settings));
+    setNumericControlValue('target-spawn-floor', settings.targetSpawnFloor);
     setNumericControlValue('spawn-distance-min', settings.spawnDistanceMin);
     setNumericControlValue('spawn-distance-max', settings.spawnDistanceMax);
     setNumericControlValue('target-spawn-y-variance', settings.targetSpawnYVariance);
