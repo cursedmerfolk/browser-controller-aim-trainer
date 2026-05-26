@@ -295,8 +295,7 @@ export function createCombatSystem({
 
   function fireTargetProjectile(target, aimOffsetX = 0) {
     const start = target.localToWorld(target.userData.head.position.clone());
-    const aimedPoint = getCameraOrigin();
-    aimedPoint.x += aimOffsetX;
+    const aimedPoint = getEnemyAimPoint(start, aimOffsetX);
     const toTargetPoint = aimedPoint.clone().sub(start);
     const distance = toTargetPoint.length();
 
@@ -321,6 +320,34 @@ export function createCombatSystem({
       progress: 0,
       duration: Math.max(distance / settings.enemyProjectileSpeed, 0.04)
     });
+  }
+
+  function getEnemyAimPoint(start, aimOffsetX) {
+    const cameraOrigin = getCameraOrigin();
+    const aimedPoint = cameraOrigin.clone();
+    aimedPoint.x = getTrackedPlayerAimX() + aimOffsetX;
+    aimedPoint.addScaledVector(
+      state.playerVelocity,
+      getEnemyLeadBlend() * getProjectileTravelTimeSeconds(start, aimedPoint)
+    );
+    aimedPoint.y = cameraOrigin.y;
+    return aimedPoint;
+  }
+
+  function getTrackedPlayerAimX() {
+    return state.movementPathDirection === 0 ? camera.position.x : state.movementPathTrackedX;
+  }
+
+  function getEnemyLeadBlend() {
+    if (state.movementPathDirection === 0) {
+      return 0;
+    }
+
+    return THREE.MathUtils.smoothstep(state.movementPathAge, 0.35, 1.15);
+  }
+
+  function getProjectileTravelTimeSeconds(start, end) {
+    return start.distanceTo(end) / Math.max(settings.enemyProjectileSpeed, 0.01);
   }
 
   function updateEnemyProjectiles(delta) {

@@ -38,11 +38,15 @@ export function createPlayerSystem({
     state.damageFlinch = 0;
     state.restartPressedLastFrame = false;
     state.strafeVelocityX = 0;
+    state.movementPathDirection = 0;
+    state.movementPathAge = 0;
+    state.movementPathTrackedX = 0;
     state.gamepadTimestampMs = null;
     state.gamepadRenderDelayMs = null;
     state.displayedGamepadRenderDelayMs = null;
     state.lastGamepadDelayDisplayUpdateMs = 0;
     camera.position.set(0, PLAYER_EYE_HEIGHT, 0);
+    state.movementPathTrackedX = camera.position.x;
     previousCameraOrigin.copy(camera.position);
     updateCamera();
     resetTargets();
@@ -69,6 +73,7 @@ export function createPlayerSystem({
   }
 
   function applyPlayerMovement(moveX, delta) {
+    updateMovementPathDirection(moveX);
     const targetVelocityX = moveX * settings.maxStrafeSpeed;
     state.strafeVelocityX = THREE.MathUtils.damp(state.strafeVelocityX, targetVelocityX, settings.strafeAcceleration, delta);
 
@@ -78,6 +83,39 @@ export function createPlayerSystem({
 
     camera.position.x += state.strafeVelocityX * delta;
     camera.position.y = PLAYER_EYE_HEIGHT;
+    updateMovementPathTracking(delta);
+  }
+
+  function updateMovementPathDirection(moveX) {
+    const moveDirection = Math.abs(moveX) > 0.01 ? Math.sign(moveX) : 0;
+    const startedNewPath = moveDirection !== 0 && moveDirection !== state.movementPathDirection;
+
+    if (startedNewPath) {
+      state.movementPathDirection = moveDirection;
+      state.movementPathAge = 0;
+      state.movementPathTrackedX = camera.position.x;
+    } else if (moveDirection === 0 && state.movementPathDirection !== 0) {
+      state.movementPathDirection = 0;
+      state.movementPathAge = 0;
+      state.movementPathTrackedX = camera.position.x;
+    }
+  }
+
+  function updateMovementPathTracking(delta) {
+    if (state.movementPathDirection === 0) {
+      state.movementPathTrackedX = camera.position.x;
+      return;
+    }
+
+    state.movementPathAge += delta;
+    const catchUpProgress = THREE.MathUtils.clamp(state.movementPathAge / 1.2, 0, 1);
+    const catchUpRate = THREE.MathUtils.lerp(2.4, 10, catchUpProgress);
+    state.movementPathTrackedX = THREE.MathUtils.damp(
+      state.movementPathTrackedX,
+      camera.position.x,
+      catchUpRate,
+      delta
+    );
   }
 
   function updatePlayerVelocity(delta) {
