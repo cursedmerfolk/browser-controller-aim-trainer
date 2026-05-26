@@ -14,6 +14,7 @@ export function renderHudMarkup({ gamepadName, playerMaxHealth }) {
         </button>
       </div>
       <div class="panel-content">
+        <div class="controls-note">Browser Controller Aim Trainer is a free web aim trainer for controller and mouse practice with support for game and weapon profiles with extensive customization.</div>
         <div id="gamepad-status">Controller: ${gamepadName}</div>
         <div id="framerate">FPS: 0</div>
         <div id="health" class="hud-stat">Health: ${playerMaxHealth}</div>
