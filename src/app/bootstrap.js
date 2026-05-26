@@ -152,7 +152,7 @@ export function bootstrapApp() {
     state.fps = delta > 0 ? 1 / delta : 0;
     playerSystem.updateFrameDecay(delta);
     const input = getInputState();
-    if (state.isGameOver && input.restartPressed && !state.restartPressedLastFrame) {
+    if (input.restartPressed && !state.restartPressedLastFrame) {
       playerSystem.restartGame();
     }
     state.restartPressedLastFrame = input.restartPressed;

@@ -120,6 +120,7 @@ export function updateCrosshair(hudElements, state, getCurrentSpreadPx) {
 
 export function updateHud(hudElements, state) {
   const accuracy = state.shots === 0 ? 0 : Math.round((state.hits / state.shots) * 100);
+  const modifiedScore = ((accuracy / 100) * state.score).toFixed(1);
   const misses = Math.max(0, state.shots - state.hits);
   const gamepadDelay =
     state.displayedGamepadRenderDelayMs === null ? 'n/a' : `${Math.round(state.displayedGamepadRenderDelayMs * 10) / 10}ms`;
@@ -130,7 +131,7 @@ export function updateHud(hudElements, state) {
   hudElements.accuracy.textContent = `Accuracy: ${accuracy}%`;
   hudElements.hits.textContent = `Hits: ${state.hits}`;
   hudElements.misses.textContent = `Misses: ${misses}`;
-  hudElements.score.textContent = `Score: ${state.score}`;
+  hudElements.score.textContent = `${accuracy}% x ${state.score} targets = ${modifiedScore}`;
   hudElements.status.textContent = state.isGameOver ? 'Status: LOST - press Restart' : 'Status: READY';
   hudElements.rawStick.textContent = `Raw stick: X ${state.rawStickX.toFixed(2)} | Y ${state.rawStickY.toFixed(2)}`;
   hudElements.inputDelay.textContent = `Pad delay: ${gamepadDelay}`;
