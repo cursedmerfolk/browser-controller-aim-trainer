@@ -50,8 +50,12 @@ export function createGamepadInput({ state, settings, onUnlockAudio = () => {} }
     return discoverController();
   }
 
-  function processStickAxis(value) {
+  function processLookAxis(value) {
     return applyResponseCurve(applyDeadzone(value, settings.deadzone));
+  }
+
+  function processMoveAxis(value) {
+    return applyDeadzone(value, settings.deadzone);
   }
 
   function applyDeadzone(value, deadzone) {
@@ -96,9 +100,9 @@ export function createGamepadInput({ state, settings, onUnlockAudio = () => {} }
       state.rawStickY = pad.axes[3] ?? 0;
       updateGamepadTimestamp(pad);
 
-      controllerLookX = processStickAxis(state.rawStickX);
-      controllerLookY = processStickAxis(state.rawStickY);
-      moveX += processStickAxis(pad.axes[0] ?? 0);
+      controllerLookX = processLookAxis(state.rawStickX);
+      controllerLookY = processLookAxis(state.rawStickY);
+      moveX += processMoveAxis(pad.axes[0] ?? 0);
       shootPressed = getGamepadShootPressed(pad);
       adsPressed = getGamepadAdsPressed(pad);
       restartPressed = getGamepadRestartPressed(pad);

@@ -339,6 +339,10 @@ gap: 6px;
   opacity: 0.82;
 }
 
+.controls-note a {
+  color: rgba(255, 255, 255, 0.92);
+}
+
 .button-row {
   display: flex;
   flex-wrap: wrap;
