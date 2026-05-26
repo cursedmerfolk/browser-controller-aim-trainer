@@ -2,6 +2,15 @@ import * as THREE from 'three';
 import { MUZZLE_SCALE, PLAYER_EYE_HEIGHT } from '../config/constants.js';
 
 const FLOOR_VISUAL_OFFSET = 0.16;
+const FLOOR_TILE_WIDTH = 64;
+const FLOOR_TILE_DEPTH = 180;
+const FLOOR_TILE_COUNT = 7;
+const FLOOR_TILE_Z = -64;
+const BACKDROP_TILE_WIDTH = 56;
+const BACKDROP_TILE_HEIGHT = 22;
+const BACKDROP_TILE_COUNT = 7;
+const BACKDROP_TILE_Y = 11;
+const BACKDROP_TILE_Z = -88;
 
 export function createSceneSystem({ app, settings, state }) {
   const renderer = new THREE.WebGLRenderer({ antialias: true });
@@ -29,25 +38,41 @@ export function createSceneSystem({ app, settings, state }) {
 
   const floorTexture = createCheckerboardTexture();
   floorTexture.anisotropy = renderer.capabilities.getMaxAnisotropy();
-  const floor = new THREE.Mesh(
-    new THREE.PlaneGeometry(64, 180),
-    new THREE.MeshStandardMaterial({ map: floorTexture, roughness: 0.82 })
-  );
-  floor.rotation.x = -Math.PI / 2;
-  floor.position.z = -64;
-  floor.receiveShadow = true;
-  scene.add(floor);
+  const floorMaterial = new THREE.MeshStandardMaterial({ map: floorTexture, roughness: 0.82 });
+  const floorTiles = createTiledPlaneStrip({
+    tileCount: FLOOR_TILE_COUNT,
+    tileWidth: FLOOR_TILE_WIDTH,
+    tileHeight: FLOOR_TILE_DEPTH,
+    material: floorMaterial,
+    rotationX: -Math.PI / 2,
+    receiveShadow: true
+  });
+  for (const floorTile of floorTiles) {
+    scene.add(floorTile);
+  }
+
+  const backdropMaterial = new THREE.MeshStandardMaterial({ color: 0x182039, roughness: 0.8 });
+  const backdropTiles = createTiledPlaneStrip({
+    tileCount: BACKDROP_TILE_COUNT,
+    tileWidth: BACKDROP_TILE_WIDTH,
+    tileHeight: BACKDROP_TILE_HEIGHT,
+    material: backdropMaterial,
+    receiveShadow: true
+  });
+  for (const backdropTile of backdropTiles) {
+    scene.add(backdropTile);
+  }
 
   const backWall = new THREE.Mesh(
-    new THREE.PlaneGeometry(56, 22),
-    new THREE.MeshStandardMaterial({ color: 0x182039, roughness: 0.8 })
+    new THREE.PlaneGeometry(BACKDROP_TILE_WIDTH, BACKDROP_TILE_HEIGHT),
+    new THREE.MeshBasicMaterial({ visible: false })
   );
-  backWall.position.set(0, 11, -88);
-  backWall.receiveShadow = true;
-  scene.add(backWall);
+  backWall.position.set(0, BACKDROP_TILE_Y, BACKDROP_TILE_Z);
 
   const weapon = createWeaponModel();
   camera.add(weapon);
+
+  updateEnvironmentTiles(camera.position.x, settings.targetSpawnFloor);
 
   window.addEventListener('resize', () => {
     camera.aspect = window.innerWidth / window.innerHeight;
@@ -64,7 +89,7 @@ export function createSceneSystem({ app, settings, state }) {
   }
 
   function updateCamera() {
-    floor.position.y = settings.targetSpawnFloor - FLOOR_VISUAL_OFFSET;
+    updateEnvironmentTiles(camera.position.x, settings.targetSpawnFloor);
     camera.rotation.order = 'YXZ';
     const flinchProgress = 1 - state.damageFlinch;
     const flinchYaw = Math.sin(flinchProgress * Math.PI * 3) * 0.014 * state.damageFlinchDirection * state.damageFlinch;
@@ -128,6 +153,12 @@ export function createSceneSystem({ app, settings, state }) {
     return camera.localToWorld(weapon.userData.barrelTipLocal.clone().applyMatrix4(muzzleMatrix));
   }
 
+  function updateEnvironmentTiles(cameraX, spawnFloor) {
+    updateTiledPlaneStrip(floorTiles, cameraX, FLOOR_TILE_WIDTH, spawnFloor - FLOOR_VISUAL_OFFSET, FLOOR_TILE_Z);
+    updateTiledPlaneStrip(backdropTiles, cameraX, BACKDROP_TILE_WIDTH, BACKDROP_TILE_Y, BACKDROP_TILE_Z);
+    backWall.position.x = cameraX;
+  }
+
   return {
     renderer,
     scene,
@@ -141,6 +172,30 @@ export function createSceneSystem({ app, settings, state }) {
     updateWeaponTransform,
     getProjectileStart
   };
+}
+
+function createTiledPlaneStrip({ tileCount, tileWidth, tileHeight, material, rotationX = 0, receiveShadow = false }) {
+  const tiles = [];
+
+  for (let index = 0; index < tileCount; index += 1) {
+    const tile = new THREE.Mesh(new THREE.PlaneGeometry(tileWidth, tileHeight), material);
+    tile.rotation.x = rotationX;
+    tile.receiveShadow = receiveShadow;
+    tiles.push(tile);
+  }
+
+  return tiles;
+}
+
+function updateTiledPlaneStrip(tiles, anchorX, tileWidth, y, z) {
+  const halfTileCount = Math.floor(tiles.length / 2);
+  const centerTileIndex = Math.round(anchorX / tileWidth);
+
+  for (let index = 0; index < tiles.length; index += 1) {
+    const tile = tiles[index];
+    const tileIndex = centerTileIndex + index - halfTileCount;
+    tile.position.set(tileIndex * tileWidth, y, z);
+  }
 }
 
 function createCheckerboardTexture() {
