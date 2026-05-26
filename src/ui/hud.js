@@ -24,6 +24,7 @@ export function renderHudMarkup({ gamepadName, playerMaxHealth }) {
         <div id="status">Status: READY</div>
         <div id="raw-stick">Raw stick: X 0.00 | Y 0.00</div>
         <div id="input-delay">Pad delay: n/a</div>
+        <div class="controls-note">Contribute on GitHub: <a href="https://github.com/cursedmerfolk/browser-controller-aim-trainer" target="_blank" rel="noreferrer">github.com/cursedmerfolk/browser-controller-aim-trainer</a></div>
         <div class="button-row">
           <button id="reset-button" type="button">Restart</button>
         </div>
@@ -78,7 +79,6 @@ export function renderControlsMarkup() {
         <div>Right click: toggle aim down sights | Shift: hold aim down sights</div>
         <div>Targets strafe, shoot at your last seen position, and despawn after a short time.</div>
         <div class="controls-note">You may need to disconnect and reconnect your controller for the browser to register it.</div>
-        <div class="controls-note"><a href="https://github.com/cursedmerfolk/browser-controller-aim-trainer" target="_blank" rel="noreferrer">github.com/cursedmerfolk/browser-controller-aim-trainer</a></div>
         <div class="button-row">
           <button id="discover-controller-button" type="button">Discover controller</button>
         </div>
