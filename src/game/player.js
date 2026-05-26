@@ -108,8 +108,8 @@ export function createPlayerSystem({
     }
 
     state.movementPathAge += delta;
-    const catchUpProgress = THREE.MathUtils.clamp(state.movementPathAge / 1.2, 0, 1);
-    const catchUpRate = THREE.MathUtils.lerp(2.4, 10, catchUpProgress);
+    const catchUpProgress = THREE.MathUtils.clamp(state.movementPathAge / 0.8, 0, 1);
+    const catchUpRate = THREE.MathUtils.lerp(3.2, 12, catchUpProgress);
     state.movementPathTrackedX = THREE.MathUtils.damp(
       state.movementPathTrackedX,
       camera.position.x,

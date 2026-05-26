@@ -343,7 +343,7 @@ export function createCombatSystem({
       return 0;
     }
 
-    return THREE.MathUtils.smoothstep(state.movementPathAge, 0.35, 1.15);
+    return THREE.MathUtils.smoothstep(state.movementPathAge, 0.2, 0.75);
   }
 
   function getProjectileTravelTimeSeconds(start, end) {
