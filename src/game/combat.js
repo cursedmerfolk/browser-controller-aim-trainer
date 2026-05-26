@@ -14,6 +14,7 @@ export function createCombatSystem({
   getProjectileStart,
   updateCamera,
   playWeaponShotSound,
+  onPlayerGameOver,
   getTargetRoot,
   applyHitToTarget,
   getNearestTargetInCone,
@@ -386,6 +387,7 @@ export function createCombatSystem({
     }
 
     state.isGameOver = true;
+    onPlayerGameOver();
     state.mouseShootPressed = false;
     state.mouseAdsPressed = false;
 

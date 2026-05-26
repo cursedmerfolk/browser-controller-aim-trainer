@@ -1,3 +1,5 @@
+import { getModifiedScore } from '../utils/score.js';
+
 export function renderHudMarkup({ gamepadName, playerMaxHealth }) {
   return `
     <div class="hud-panel hud edge-panel" id="hud-panel" data-side="left">
@@ -47,6 +49,8 @@ export function renderHudMarkup({ gamepadName, playerMaxHealth }) {
       <div class="game-over-card">
         <strong>Game Over</strong>
         <div>You ran out of health.</div>
+        <div id="game-over-high-score">Highest score: 0.0</div>
+        <div id="game-over-high-score-message" class="game-over-hint"></div>
         <div class="button-row">
           <button id="game-over-restart-button" type="button">Restart</button>
         </div>
@@ -103,6 +107,8 @@ export function getHudElements(root = document) {
     crosshair: root.querySelector('#crosshair'),
     damageOverlay: root.querySelector('#damage-overlay'),
     gameOverOverlay: root.querySelector('#game-over-overlay'),
+    gameOverHighScore: root.querySelector('#game-over-high-score'),
+    gameOverHighScoreMessage: root.querySelector('#game-over-high-score-message'),
     hudPanel: root.querySelector('#hud-panel'),
     controlsPanel: root.querySelector('#controls-panel'),
     discoverControllerButton: root.querySelector('#discover-controller-button'),
@@ -120,7 +126,7 @@ export function updateCrosshair(hudElements, state, getCurrentSpreadPx) {
 
 export function updateHud(hudElements, state) {
   const accuracy = state.shots === 0 ? 0 : Math.round((state.hits / state.shots) * 100);
-  const modifiedScore = ((accuracy / 100) * state.score).toFixed(1);
+  const modifiedScore = getModifiedScore(state).toFixed(1);
   const misses = Math.max(0, state.shots - state.hits);
   const gamepadDelay =
     state.displayedGamepadRenderDelayMs === null ? 'n/a' : `${Math.round(state.displayedGamepadRenderDelayMs * 10) / 10}ms`;
@@ -135,6 +141,8 @@ export function updateHud(hudElements, state) {
   hudElements.status.textContent = state.isGameOver ? 'Status: LOST - press Restart' : 'Status: READY';
   hudElements.rawStick.textContent = `Raw stick: X ${state.rawStickX.toFixed(2)} | Y ${state.rawStickY.toFixed(2)}`;
   hudElements.inputDelay.textContent = `Pad delay: ${gamepadDelay}`;
+  hudElements.gameOverHighScore.textContent = `Highest score: ${state.highScore.toFixed(1)}`;
+  hudElements.gameOverHighScoreMessage.textContent = state.gotNewHighScore ? 'New high score!' : '';
   hudElements.gameOverOverlay.classList.toggle('is-visible', state.isGameOver);
   hudElements.gameOverOverlay.setAttribute('aria-hidden', String(!state.isGameOver));
 }

@@ -18,6 +18,7 @@ export function createPlayerSystem({
     state.hits = 0;
     state.playerHealth = PLAYER_MAX_HEALTH;
     state.isGameOver = false;
+    state.gotNewHighScore = false;
     state.lastFrameTime = null;
     state.yaw = 0;
     state.pitch = 0;

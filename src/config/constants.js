@@ -2,6 +2,7 @@ import * as THREE from 'three';
 
 export const SETTINGS_STORAGE_KEY = 'browser-controller-aim-trainer.settings';
 export const SETTINGS_EXPORT_STORAGE_KEY = 'browser-controller-aim-trainer.export';
+export const HIGH_SCORE_STORAGE_KEY = 'browser-controller-aim-trainer.high-score';
 export const SETTINGS_STORAGE_VERSION = 3;
 
 export const RESPONSE_CURVE_OPTIONS = [
@@ -20,7 +21,7 @@ export const MUZZLE_SCALE = new THREE.Vector3(1, 1, 1);
 export const TARGET_BODY_BASE_HEIGHT = 0.96;
 export const TARGET_HEAD_RADIUS = 0.18;
 export const PLAYER_EYE_HEIGHT = 2.2;
-export const PLAYER_MAX_HEALTH = 50;
+export const PLAYER_MAX_HEALTH = 10;
 export const TARGET_PROJECTILE_DAMAGE = 1;
 export const TARGET_PROJECTILE_HIT_RADIUS = 0.4;
 export const CENTER_SCREEN = new THREE.Vector2(0, 0);

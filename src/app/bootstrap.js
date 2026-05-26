@@ -12,6 +12,7 @@ import { createAimAssistSystem } from '../game/aim-assist.js';
 import { createSceneSystem } from '../rendering/scene.js';
 import { createDebugSystem } from '../rendering/debug.js';
 import { createHitSoundController } from '../audio/hit-sounds.js';
+import { loadHighScore, storeHighScore, getModifiedScore } from '../utils/score.js';
 
 export function bootstrapApp() {
   const profileController = createProfileStateController();
@@ -67,6 +68,15 @@ export function bootstrapApp() {
     getProjectileStart: sceneSystem.getProjectileStart,
     updateCamera: sceneSystem.updateCamera,
     playWeaponShotSound: hitSoundController.playWeaponShotSound,
+    onPlayerGameOver: () => {
+      const modifiedScore = getModifiedScore(state);
+      const isNewHighScore = modifiedScore > state.highScore;
+      state.highScore = Math.max(state.highScore, modifiedScore);
+      state.gotNewHighScore = isNewHighScore;
+      if (isNewHighScore) {
+        storeHighScore(state.highScore);
+      }
+    },
     getTargetRoot: targetSystem.getTargetRoot,
     applyHitToTarget: targetSystem.applyHitToTarget,
     getNearestTargetInCone: aimAssistSystem.getNearestTargetInCone,
@@ -208,6 +218,8 @@ function createInitialState() {
     lastFrameTime: null,
     playerHealth: PLAYER_MAX_HEALTH,
     isGameOver: false,
+    highScore: loadHighScore(),
+    gotNewHighScore: false,
     activeGamepadIndex: null,
     gamepadName: 'No controller detected',
     gamepadTimestampMs: null,
